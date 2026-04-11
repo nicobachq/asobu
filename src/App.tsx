@@ -20,12 +20,50 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    async function ensureProfile() {
+      if (!session?.user) return;
+
+      const userId = session.user.id;
+      const email = session.user.email ?? "";
+
+      const { data: existingProfile, error: fetchError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Error checking profile:", fetchError.message);
+        return;
+      }
+
+      if (!existingProfile) {
+        const fallbackName = email ? email.split("@")[0] : "New User";
+
+        const { error: insertError } = await supabase.from("profiles").insert({
+          id: userId,
+          full_name: fallbackName,
+          role: "athlete",
+          location: "",
+          main_sport: "",
+        });
+
+        if (insertError) {
+          console.error("Error creating profile:", insertError.message);
+        }
+      }
+    }
+
+    ensureProfile();
+  }, [session]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
