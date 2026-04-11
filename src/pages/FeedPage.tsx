@@ -55,7 +55,7 @@ function FeedPage() {
   ];
 
   return (
-    <main className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[280px_1fr_280px]">
+    <main className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[290px_minmax(0,1fr)_280px]">
       <ProfileCard profile={profile} />
       <FeedCard posts={posts} />
       <SuggestionsCard suggestions={suggestions} />
