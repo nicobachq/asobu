@@ -1186,8 +1186,6 @@ function OrganizationPage() {
 
   const solidSecondaryButton =
     "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50";
-  const solidDangerButton =
-    "rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50";
   const solidPrimaryButton =
     "rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-60";
   const smallPrimaryButton =
@@ -1196,11 +1194,15 @@ function OrganizationPage() {
     "rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60";
   const smallDangerButton =
     "rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-60";
+  const heroGhostButton =
+    "rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-medium text-white backdrop-blur hover:bg-white/15";
+  const heroGhostDangerButton =
+    "rounded-2xl border border-red-200/40 bg-red-500/10 px-4 py-3 text-sm font-medium text-white backdrop-blur hover:bg-red-500/20";
 
   if (loading) {
     return (
       <main className="px-6 py-6">
-        <div className="mx-auto max-w-7xl rounded-3xl bg-white p-6 shadow-sm">
+        <div className="mx-auto max-w-[1500px] rounded-[32px] bg-white p-6 shadow-sm">
           Loading organization...
         </div>
       </main>
@@ -1210,7 +1212,7 @@ function OrganizationPage() {
   if (!organization) {
     return (
       <main className="px-6 py-6">
-        <div className="mx-auto max-w-5xl rounded-3xl bg-white p-6 shadow-sm">
+        <div className="mx-auto max-w-5xl rounded-[32px] bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-bold text-slate-900">Organization page</h1>
           <p className="mt-3 text-sm text-slate-600">
             {pageError || "Organization not found."}
@@ -1229,15 +1231,15 @@ function OrganizationPage() {
   }
 
   return (
-    <main className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[290px_minmax(0,1fr)_280px]">
+    <main className="mx-auto grid max-w-[1500px] grid-cols-1 gap-6 px-6 py-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
       <div>
         <ProfileCard profile={profile} />
       </div>
 
-      <div className="space-y-5">
-        <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
+      <div className="space-y-6">
+        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
           <div
-            className="h-56 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+            className="relative h-[360px] bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
             style={
               organization.cover_image_url
                 ? {
@@ -1247,55 +1249,28 @@ function OrganizationPage() {
                   }
                 : undefined
             }
-          />
+          >
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/45 to-slate-900/10" />
 
-          <div className="px-6 pb-6">
-            <div className="-mt-14 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex min-w-0 items-end gap-4">
-                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-white shadow-md">
-                  {organization.logo_url ? (
-                    <img
-                      src={organization.logo_url}
-                      alt={organization.name}
-                      className="h-full w-full rounded-[1.1rem] object-contain p-2"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-xl font-semibold text-white">
-                      {getInitials(organization.name)}
-                    </div>
-                  )}
-                </div>
+            <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-6">
+              <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-white backdrop-blur">
+                Organization
+              </span>
 
-                <div className="min-w-0 pt-2">
-                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">
-                    Organization
-                  </p>
-                  <h1 className="mt-2 text-3xl font-bold leading-tight text-slate-900">
-                    {organization.name}
-                  </h1>
-                  <p className="mt-2 text-sm font-medium text-slate-600">
-                    {organization.organization_type}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {organization.location || "No location yet"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 lg:justify-end">
+              <div className="flex flex-wrap justify-end gap-2">
                 {myMembershipRole ? (
-                  <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700">
+                  <span className="rounded-full border border-emerald-200/40 bg-emerald-400/20 px-4 py-2 text-sm font-medium text-white backdrop-blur">
                     {myMembershipRole}
                   </span>
                 ) : hasPendingRequest ? (
-                  <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-medium text-amber-700">
+                  <span className="rounded-full border border-amber-200/40 bg-amber-400/20 px-4 py-2 text-sm font-medium text-white backdrop-blur">
                     pending request
                   </span>
                 ) : (
                   <button
                     onClick={handleJoinRequest}
                     disabled={joiningOrganization}
-                    className={solidPrimaryButton}
+                    className={heroGhostButton + " disabled:opacity-60"}
                   >
                     {joiningOrganization ? "Sending..." : "Request to join"}
                   </button>
@@ -1308,7 +1283,7 @@ function OrganizationPage() {
                       setPageError("");
                       setPageMessage("");
                     }}
-                    className={solidSecondaryButton}
+                    className={heroGhostButton}
                   >
                     Edit organization
                   </button>
@@ -1318,45 +1293,132 @@ function OrganizationPage() {
                   <button
                     onClick={handleLeaveOrganization}
                     disabled={leavingOrganization}
-                    className={solidDangerButton}
+                    className={heroGhostDangerButton + " disabled:opacity-60"}
                   >
                     {leavingOrganization ? "Leaving..." : "Leave organization"}
                   </button>
                 )}
 
-                <Link to="/organizations" className={solidSecondaryButton}>
+                <Link to="/organizations" className={heroGhostButton}>
                   All organizations
                 </Link>
               </div>
             </div>
 
-            <p className="mt-6 text-sm leading-7 text-slate-700">
-              {organization.description || "No description yet."}
-            </p>
+            <div className="absolute inset-x-0 bottom-0 p-6">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div className="flex min-w-0 items-end gap-4">
+                  <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-[28px] border border-white/20 bg-white shadow-xl">
+                    {organization.logo_url ? (
+                      <img
+                        src={organization.logo_url}
+                        alt={organization.name}
+                        className="h-full w-full rounded-[24px] object-contain p-2.5"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center rounded-[24px] bg-slate-900 text-2xl font-semibold text-white">
+                        {getInitials(organization.name)}
+                      </div>
+                    )}
+                  </div>
 
-            <div className="mt-6 flex flex-wrap gap-2">
-              {organization.sport && (
-                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                  {organization.sport}
+                  <div className="min-w-0">
+                    <h1 className="max-w-3xl text-4xl font-bold leading-tight text-white md:text-5xl">
+                      {organization.name}
+                    </h1>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/85">
+                      <span className="font-medium">
+                        {organization.organization_type}
+                      </span>
+                      <span>•</span>
+                      <span>{organization.location || "No location yet"}</span>
+                      {organization.sport && (
+                        <>
+                          <span>•</span>
+                          <span>{organization.sport}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 rounded-[28px] border border-white/15 bg-white/10 p-4 text-white backdrop-blur md:min-w-[280px]">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-white/60">
+                      Members
+                    </p>
+                    <p className="mt-2 text-3xl font-bold">{memberCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-white/60">
+                      Pending
+                    </p>
+                    <p className="mt-2 text-3xl font-bold">{joinRequests.length}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div>
+              <p className="text-base leading-8 text-slate-700">
+                {organization.description || "No description yet."}
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {organization.sport && (
+                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                    {organization.sport}
+                  </span>
+                )}
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  {memberCount} {memberCount === 1 ? "member" : "members"}
                 </span>
-              )}
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                {memberCount} {memberCount === 1 ? "member" : "members"}
-              </span>
-              {ownerNames.map((ownerName) => (
-                <span
-                  key={ownerName}
-                  className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700"
-                >
-                  Owner · {ownerName}
-                </span>
-              ))}
+                {ownerNames.map((ownerName) => (
+                  <span
+                    key={ownerName}
+                    className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700"
+                  >
+                    Owner · {ownerName}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-[24px] bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Status</p>
+                <p className="mt-2 font-semibold text-slate-900">
+                  {sidebarStatusLabel}
+                </p>
+              </div>
+              <div className="rounded-[24px] bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Type</p>
+                <p className="mt-2 font-semibold capitalize text-slate-900">
+                  {organization.organization_type}
+                </p>
+              </div>
+              <div className="rounded-[24px] bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Location</p>
+                <p className="mt-2 font-semibold text-slate-900">
+                  {organization.location || "Not specified"}
+                </p>
+              </div>
+              <div className="rounded-[24px] bg-slate-50 p-4">
+                <p className="text-sm text-slate-500">Founded on Asobu</p>
+                <p className="mt-2 font-semibold text-slate-900">
+                  {organization.created_at
+                    ? new Date(organization.created_at).toLocaleDateString()
+                    : "Recently"}
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
         {(pageError || pageMessage) && (
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <section className="rounded-[32px] bg-white p-5 shadow-sm">
             {pageError && <p className="text-sm text-red-600">{pageError}</p>}
             {pageMessage && (
               <p className={`text-sm ${pageError ? "mt-2" : ""} text-slate-600`}>
@@ -1367,10 +1429,10 @@ function OrganizationPage() {
         )}
 
         {canEditOrganization && (
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <section className="rounded-[32px] bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">
+                <h2 className="text-2xl font-semibold text-slate-900">
                   Organization settings
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
@@ -1384,7 +1446,7 @@ function OrganizationPage() {
             </div>
 
             {editMode ? (
-              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Organization name
@@ -1451,22 +1513,22 @@ function OrganizationPage() {
                   />
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 p-4">
+                <div className="rounded-[28px] border border-slate-200 p-4">
                   <p className="text-sm font-medium text-slate-700">Logo</p>
                   <p className="mt-1 text-xs text-slate-500">
                     Recommended: rectangular or square logo. Max 2 MB.
                   </p>
 
                   <div className="mt-4 flex items-center gap-4">
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl border border-slate-200 bg-white">
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[24px] border border-slate-200 bg-white">
                       {logoPreviewUrl ? (
                         <img
                           src={logoPreviewUrl}
                           alt="Logo preview"
-                          className="h-full w-full rounded-[1.1rem] object-contain p-2"
+                          className="h-full w-full rounded-[20px] object-contain p-2"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
+                        <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-slate-900 text-lg font-semibold text-white">
                           {getInitials(orgName || organization.name)}
                         </div>
                       )}
@@ -1483,7 +1545,11 @@ function OrganizationPage() {
                         />
                       </label>
 
-                      <button type="button" onClick={handleRemoveLogo} className={smallSecondaryButton}>
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className={smallSecondaryButton}
+                      >
                         Remove
                       </button>
                     </div>
@@ -1494,14 +1560,14 @@ function OrganizationPage() {
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 p-4">
+                <div className="rounded-[28px] border border-slate-200 p-4">
                   <p className="text-sm font-medium text-slate-700">Cover</p>
                   <p className="mt-1 text-xs text-slate-500">
                     Recommended: wide image. Max 5 MB.
                   </p>
 
                   <div
-                    className="mt-4 h-28 rounded-2xl bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+                    className="mt-4 h-32 rounded-2xl bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
                     style={
                       coverPreviewUrl
                         ? {
@@ -1524,7 +1590,11 @@ function OrganizationPage() {
                       />
                     </label>
 
-                    <button type="button" onClick={handleRemoveCover} className={smallSecondaryButton}>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      className={smallSecondaryButton}
+                    >
                       Remove
                     </button>
                   </div>
@@ -1535,7 +1605,10 @@ function OrganizationPage() {
                 </div>
 
                 <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
-                  <button onClick={handleCancelOrganizationEdit} className={solidSecondaryButton}>
+                  <button
+                    onClick={handleCancelOrganizationEdit}
+                    className={solidSecondaryButton}
+                  >
                     Cancel
                   </button>
                   <button
@@ -1548,30 +1621,30 @@ function OrganizationPage() {
                 </div>
               </div>
             ) : (
-              <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="rounded-[24px] bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">Name</p>
                   <p className="mt-2 font-medium text-slate-900">{organization.name}</p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="rounded-[24px] bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">Type</p>
                   <p className="mt-2 font-medium text-slate-900">
                     {organization.organization_type}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="rounded-[24px] bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">Sport</p>
                   <p className="mt-2 font-medium text-slate-900">
                     {organization.sport || "Not specified"}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="rounded-[24px] bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">Location</p>
                   <p className="mt-2 font-medium text-slate-900">
                     {organization.location || "Not specified"}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4 md:col-span-2">
+                <div className="rounded-[24px] bg-slate-50 p-4 md:col-span-2">
                   <p className="text-sm text-slate-500">Description</p>
                   <p className="mt-2 font-medium text-slate-900">
                     {organization.description || "No description yet."}
@@ -1583,10 +1656,10 @@ function OrganizationPage() {
         )}
 
         {canManageMembers && (
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <section className="rounded-[32px] bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">
+                <h2 className="text-2xl font-semibold text-slate-900">
                   Ownership transfer
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
@@ -1637,10 +1710,10 @@ function OrganizationPage() {
         )}
 
         {canManageOrganization && (
-          <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <section className="rounded-[32px] bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">
+                <h2 className="text-2xl font-semibold text-slate-900">
                   Pending join requests
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
@@ -1659,7 +1732,7 @@ function OrganizationPage() {
                 {joinRequests.map((request) => (
                   <div
                     key={request.id}
-                    className="rounded-2xl border border-slate-200 p-4"
+                    className="rounded-[24px] border border-slate-200 p-4"
                   >
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -1701,10 +1774,10 @@ function OrganizationPage() {
           </section>
         )}
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
+        <section className="rounded-[32px] bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">Members</h2>
+              <h2 className="text-2xl font-semibold text-slate-900">Members</h2>
               <p className="mt-2 text-sm text-slate-500">
                 People currently inside this organization.
               </p>
@@ -1730,7 +1803,7 @@ function OrganizationPage() {
                 return (
                   <div
                     key={member.id}
-                    className="rounded-2xl border border-slate-200 p-4"
+                    className="rounded-[24px] border border-slate-200 p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -1804,10 +1877,10 @@ function OrganizationPage() {
           )}
         </section>
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
+        <section className="rounded-[32px] bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">
+              <h2 className="text-2xl font-semibold text-slate-900">
                 Organization posts
               </h2>
               <p className="mt-2 text-sm text-slate-500">
@@ -1819,9 +1892,9 @@ function OrganizationPage() {
             </span>
           </div>
 
-          {canManageOrganization ? (
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="mb-4 flex items-center gap-3">
+          {canManageOrganization && (
+            <div className="mt-5 rounded-[28px] border border-slate-200 p-5">
+              <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white">
                   {organization.logo_url ? (
                     <img
@@ -1835,10 +1908,11 @@ function OrganizationPage() {
                     </div>
                   )}
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-slate-700">
+                  <p className="text-sm font-semibold text-slate-900">
                     Post as {organization.name}
-                  </label>
+                  </p>
                   <p className="text-xs text-slate-500">
                     {organization.organization_type}
                   </p>
@@ -1849,22 +1923,18 @@ function OrganizationPage() {
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="Share a result, announcement, event, or organization update..."
-                className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-300"
+                className="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-300"
               />
+
               <div className="mt-4 flex justify-end">
                 <button
                   onClick={handleCreateOrganizationPost}
                   disabled={creatingPost || !newPost.trim()}
                   className={solidPrimaryButton}
                 >
-                  {creatingPost ? "Posting..." : "Publish organization post"}
+                  {creatingPost ? "Publishing..." : "Publish organization post"}
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="mt-5 rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-              You can read, like, and comment here. To publish as this organization,
-              you must be an owner or admin.
             </div>
           )}
 
@@ -1889,7 +1959,7 @@ function OrganizationPage() {
                 return (
                   <div
                     key={post.id}
-                    className="rounded-2xl border border-slate-200 p-5"
+                    className="rounded-[28px] border border-slate-200 p-5"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
@@ -2034,12 +2104,31 @@ function OrganizationPage() {
         </section>
       </div>
 
-      <div className="space-y-5">
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Your status</h2>
+      <div className="space-y-6">
+        <section className="rounded-[32px] bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Quick overview</h2>
           <p className="mt-3 text-sm text-slate-600">{sidebarStatusLabel}</p>
 
-          <div className="mt-4 space-y-3 text-sm text-slate-700">
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-[24px] bg-slate-50 px-4 py-5">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                Members
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {memberCount}
+              </p>
+            </div>
+            <div className="rounded-[24px] bg-slate-50 px-4 py-5">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                Pending
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {joinRequests.length}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3 text-sm text-slate-700">
             <p>
               <span className="font-semibold">Organization type:</span>{" "}
               {organization.organization_type}
@@ -2055,20 +2144,20 @@ function OrganizationPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Branding</h2>
-          <div className="mt-4 space-y-4">
+        <section className="rounded-[32px] bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Branding</h2>
+          <div className="mt-5 space-y-4">
             <div>
               <p className="text-sm text-slate-500">Logo</p>
-              <div className="mt-2 flex h-24 w-24 items-center justify-center rounded-3xl border border-slate-200 bg-white">
+              <div className="mt-2 flex h-28 w-28 items-center justify-center rounded-[24px] border border-slate-200 bg-white">
                 {organization.logo_url ? (
                   <img
                     src={organization.logo_url}
                     alt={organization.name}
-                    className="h-full w-full rounded-[1.1rem] object-contain p-2"
+                    className="h-full w-full rounded-[20px] object-contain p-2"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
+                  <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-slate-900 text-lg font-semibold text-white">
                     {getInitials(organization.name)}
                   </div>
                 )}
@@ -2078,7 +2167,7 @@ function OrganizationPage() {
             <div>
               <p className="text-sm text-slate-500">Cover</p>
               <div
-                className="mt-2 h-24 rounded-2xl bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+                className="mt-2 h-28 rounded-[24px] bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
                 style={
                   organization.cover_image_url
                     ? {
@@ -2093,20 +2182,10 @@ function OrganizationPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Management</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-center">
-            <div className="rounded-2xl bg-slate-50 px-3 py-4">
-              <p className="text-2xl font-bold text-slate-900">{memberCount}</p>
-              <p className="text-xs text-slate-500">Members</p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 px-3 py-4">
-              <p className="text-2xl font-bold text-slate-900">{joinRequests.length}</p>
-              <p className="text-xs text-slate-500">Pending</p>
-            </div>
-          </div>
+        <section className="rounded-[32px] bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">Management</h2>
 
-          <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+          <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
             {canManageMembers
               ? "You can edit organization details, upload branding, transfer ownership, review join requests, promote or remove members, and publish organization posts on this page."
               : canManageOrganization
