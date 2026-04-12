@@ -9,25 +9,62 @@ type Post = {
   }[];
 };
 
+type PostLike = {
+  id: number;
+  post_id: number;
+  user_id: string;
+};
+
+type PostComment = {
+  id: number;
+  post_id: number;
+  user_id: string;
+  content: string;
+  created_at: string | null;
+  profiles: {
+    full_name: string | null;
+  }[];
+};
+
 type FeedCardProps = {
   posts: Post[];
+  likes: PostLike[];
+  comments: PostComment[];
   newPost: string;
   setNewPost: (value: string) => void;
   onCreatePost: () => void;
   onDeletePost: (postId: number) => void;
+  onToggleLike: (postId: number) => void;
+  onAddComment: (postId: number) => void;
+  onDeleteComment: (commentId: number) => void;
+  commentDrafts: Record<number, string>;
+  setCommentDrafts: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   creating: boolean;
   deletingPostId: number | null;
+  likingPostId: number | null;
+  commentingPostId: number | null;
+  deletingCommentId: number | null;
   currentUserId: string | null;
 };
 
 function FeedCard({
   posts,
+  likes,
+  comments,
   newPost,
   setNewPost,
   onCreatePost,
   onDeletePost,
+  onToggleLike,
+  onAddComment,
+  onDeleteComment,
+  commentDrafts,
+  setCommentDrafts,
   creating,
   deletingPostId,
+  likingPostId,
+  commentingPostId,
+  deletingCommentId,
   currentUserId,
 }: FeedCardProps) {
   return (
@@ -69,6 +106,13 @@ function FeedCard({
           const author = post.profiles?.[0];
           const isOwner = currentUserId === post.user_id;
 
+          const postLikes = likes.filter((like) => like.post_id === post.id);
+          const likedByMe = postLikes.some((like) => like.user_id === currentUserId);
+
+          const postComments = comments.filter(
+            (comment) => comment.post_id === post.id
+          );
+
           return (
             <div key={post.id} className="rounded-3xl bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
@@ -106,13 +150,21 @@ function FeedCard({
               </p>
 
               <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-                <span>0 likes</span>
-                <span>0 comments</span>
+                <span>{postLikes.length} likes</span>
+                <span>{postComments.length} comments</span>
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-100 pt-4">
-                <button className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
-                  Like
+                <button
+                  onClick={() => onToggleLike(post.id)}
+                  disabled={likingPostId === post.id}
+                  className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {likingPostId === post.id
+                    ? "..."
+                    : likedByMe
+                    ? "Unlike"
+                    : "Like"}
                 </button>
                 <button className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
                   Comment
@@ -120,6 +172,68 @@ function FeedCard({
                 <button className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
                   Share
                 </button>
+              </div>
+
+              <div className="mt-5 space-y-3 border-t border-slate-100 pt-4">
+                {postComments.map((comment) => {
+                  const commentAuthor = comment.profiles?.[0];
+                  const canDeleteComment = currentUserId === comment.user_id;
+
+                  return (
+                    <div
+                      key={comment.id}
+                      className="rounded-2xl bg-slate-50 px-4 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {commentAuthor?.full_name || "Member"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            {comment.content}
+                          </p>
+                        </div>
+
+                        {canDeleteComment && (
+                          <button
+                            onClick={() => onDeleteComment(comment.id)}
+                            disabled={deletingCommentId === comment.id}
+                            className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            {deletingCommentId === comment.id
+                              ? "Deleting..."
+                              : "Delete"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={commentDrafts[post.id] || ""}
+                    onChange={(e) =>
+                      setCommentDrafts((prev) => ({
+                        ...prev,
+                        [post.id]: e.target.value,
+                      }))
+                    }
+                    placeholder="Write a comment..."
+                    className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
+                  />
+                  <button
+                    onClick={() => onAddComment(post.id)}
+                    disabled={
+                      commentingPostId === post.id ||
+                      !(commentDrafts[post.id] || "").trim()
+                    }
+                    className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {commentingPostId === post.id ? "..." : "Comment"}
+                  </button>
+                </div>
               </div>
             </div>
           );
