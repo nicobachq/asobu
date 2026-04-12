@@ -36,6 +36,7 @@ function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -110,6 +111,27 @@ function FeedPage() {
     setCreating(false);
   }
 
+  async function handleDeletePost(postId: number) {
+    if (!currentUserId) return;
+
+    setDeletingPostId(postId);
+
+    const { error } = await supabase
+      .from("posts")
+      .delete()
+      .eq("id", postId)
+      .eq("user_id", currentUserId);
+
+    if (error) {
+      console.error("Error deleting post:", error.message);
+      setDeletingPostId(null);
+      return;
+    }
+
+    await loadPosts();
+    setDeletingPostId(null);
+  }
+
   const suggestions = [
     {
       id: 1,
@@ -136,7 +158,10 @@ function FeedPage() {
         newPost={newPost}
         setNewPost={setNewPost}
         onCreatePost={handleCreatePost}
+        onDeletePost={handleDeletePost}
         creating={creating}
+        deletingPostId={deletingPostId}
+        currentUserId={currentUserId}
       />
       <SuggestionsCard suggestions={suggestions} />
     </main>

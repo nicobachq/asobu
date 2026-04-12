@@ -14,7 +14,10 @@ type FeedCardProps = {
   newPost: string;
   setNewPost: (value: string) => void;
   onCreatePost: () => void;
+  onDeletePost: (postId: number) => void;
   creating: boolean;
+  deletingPostId: number | null;
+  currentUserId: string | null;
 };
 
 function FeedCard({
@@ -22,7 +25,10 @@ function FeedCard({
   newPost,
   setNewPost,
   onCreatePost,
+  onDeletePost,
   creating,
+  deletingPostId,
+  currentUserId,
 }: FeedCardProps) {
   return (
     <div className="space-y-5">
@@ -61,6 +67,7 @@ function FeedCard({
       ) : (
         posts.map((post) => {
           const author = post.profiles?.[0];
+          const isOwner = currentUserId === post.user_id;
 
           return (
             <div key={post.id} className="rounded-3xl bg-white p-5 shadow-sm">
@@ -77,9 +84,21 @@ function FeedCard({
                   </p>
                 </div>
 
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                  Post
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                    Post
+                  </span>
+
+                  {isOwner && (
+                    <button
+                      onClick={() => onDeletePost(post.id)}
+                      disabled={deletingPostId === post.id}
+                      className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {deletingPostId === post.id ? "Deleting..." : "Delete"}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <p className="mt-4 text-sm leading-7 text-slate-700">
