@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { DISCOVER_SPORT_OPTIONS, getNormalizedSportsFromValue, getSportLabelsFromValue } from "../lib/sports";
 import ProfileCard from "../components/ProfileCard";
 
 type DbProfile = {
@@ -272,24 +273,6 @@ function DiscoverPage() {
     setMemberCountsByOrg(counts);
   }
 
-  const availableSports = useMemo(() => {
-    const values = new Set<string>();
-
-    profiles.forEach((item) => {
-      if (item.main_sport) {
-        values.add(item.main_sport);
-      }
-    });
-
-    organizations.forEach((item) => {
-      if (item.sport) {
-        values.add(item.sport);
-      }
-    });
-
-    return Array.from(values).sort((a, b) => a.localeCompare(b));
-  }, [profiles, organizations]);
-
   const filteredProfiles = useMemo(() => {
     return profiles.filter((item) => {
       if (!roleMatchesTab(item.role, activeTab)) {
@@ -304,9 +287,9 @@ function DiscoverPage() {
         (item.main_sport || "").toLowerCase().includes(normalizedSearch) ||
         (item.organization_name || "").toLowerCase().includes(normalizedSearch);
 
+      const normalizedSports = getNormalizedSportsFromValue(item.main_sport);
       const matchesSport =
-        sportFilter === "all" ||
-        (item.main_sport || "").toLowerCase() === sportFilter.toLowerCase();
+        sportFilter === "all" || normalizedSports.includes(sportFilter);
 
       return matchesSearch && matchesSport;
     });
@@ -326,9 +309,9 @@ function DiscoverPage() {
         (item.sport || "").toLowerCase().includes(normalizedSearch) ||
         (item.organization_type || "").toLowerCase().includes(normalizedSearch);
 
+      const normalizedSports = getNormalizedSportsFromValue(item.sport);
       const matchesSport =
-        sportFilter === "all" ||
-        (item.sport || "").toLowerCase() === sportFilter.toLowerCase();
+        sportFilter === "all" || normalizedSports.includes(sportFilter);
 
       return matchesSearch && matchesSport;
     });
@@ -406,9 +389,9 @@ function DiscoverPage() {
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
               >
                 <option value="all">All sports</option>
-                {availableSports.map((sport) => (
-                  <option key={sport} value={sport}>
-                    {sport}
+                {DISCOVER_SPORT_OPTIONS.filter((option) => option.value !== "all").map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -474,9 +457,18 @@ function DiscoverPage() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {organization.sport && (
-                        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                          {organization.sport}
+                      {getSportLabelsFromValue(organization.sport).length > 0 ? (
+                        getSportLabelsFromValue(organization.sport).map((sportLabel) => (
+                          <span
+                            key={`${organization.id}-${sportLabel}`}
+                            className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
+                          >
+                            {sportLabel}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                          Sport not set
                         </span>
                       )}
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -525,10 +517,15 @@ function DiscoverPage() {
                       </div>
 
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {item.main_sport ? (
-                          <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                            {item.main_sport}
-                          </span>
+                        {getSportLabelsFromValue(item.main_sport).length > 0 ? (
+                          getSportLabelsFromValue(item.main_sport).map((sportLabel) => (
+                            <span
+                              key={`${item.id}-${sportLabel}`}
+                              className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
+                            >
+                              {sportLabel}
+                            </span>
+                          ))
                         ) : (
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                             Sport not set
