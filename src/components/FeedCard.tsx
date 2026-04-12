@@ -1,12 +1,19 @@
+import type { Dispatch, SetStateAction } from "react";
+
 type Post = {
   id: number;
   user_id: string;
+  organization_id: number | null;
   content: string;
   created_at: string | null;
   profiles: {
     full_name: string | null;
     role: string | null;
-  }[];
+  } | null;
+  organizations: {
+    name: string;
+    organization_type: string | null;
+  } | null;
 };
 
 type PostLike = {
@@ -23,13 +30,23 @@ type PostComment = {
   created_at: string | null;
   profiles: {
     full_name: string | null;
-  }[];
+  } | null;
+};
+
+type ManageableOrganization = {
+  id: number;
+  name: string;
+  organization_type: string | null;
 };
 
 type FeedCardProps = {
   posts: Post[];
   likes: PostLike[];
   comments: PostComment[];
+  manageableOrganizations: ManageableOrganization[];
+  selectedPublisher: string;
+  setSelectedPublisher: (value: string) => void;
+  currentProfileName: string;
   newPost: string;
   setNewPost: (value: string) => void;
   onCreatePost: () => void;
@@ -38,7 +55,7 @@ type FeedCardProps = {
   onAddComment: (postId: number) => void;
   onDeleteComment: (commentId: number) => void;
   commentDrafts: Record<number, string>;
-  setCommentDrafts: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+  setCommentDrafts: Dispatch<SetStateAction<Record<number, string>>>;
   creating: boolean;
   deletingPostId: number | null;
   likingPostId: number | null;
@@ -51,6 +68,10 @@ function FeedCard({
   posts,
   likes,
   comments,
+  manageableOrganizations,
+  selectedPublisher,
+  setSelectedPublisher,
+  currentProfileName,
   newPost,
   setNewPost,
   onCreatePost,
@@ -70,12 +91,37 @@ function FeedCard({
   return (
     <div className="space-y-5">
       <div className="rounded-3xl bg-white p-5 shadow-sm">
-        <textarea
-          value={newPost}
-          onChange={(e) => setNewPost(e.target.value)}
-          placeholder="Share a result, achievement, photo, transfer update, or community news..."
-          className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-300"
-        />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Publish as
+            </label>
+            <select
+              value={selectedPublisher}
+              onChange={(e) => setSelectedPublisher(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+            >
+              <option value="me">Me · {currentProfileName}</option>
+              {manageableOrganizations.map((organization) => (
+                <option key={organization.id} value={`org-${organization.id}`}>
+                  Organization · {organization.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Post content
+            </label>
+            <textarea
+              value={newPost}
+              onChange={(e) => setNewPost(e.target.value)}
+              placeholder="Share a result, achievement, photo, transfer update, or community news..."
+              className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-300"
+            />
+          </div>
+        </div>
 
         <div className="mt-4 flex items-center justify-between gap-4">
           <div className="flex flex-wrap gap-3">
@@ -103,7 +149,8 @@ function FeedCard({
         </div>
       ) : (
         posts.map((post) => {
-          const author = post.profiles?.[0];
+          const author = post.profiles;
+          const organization = post.organizations;
           const isOwner = currentUserId === post.user_id;
 
           const postLikes = likes.filter((like) => like.post_id === post.id);
@@ -113,15 +160,23 @@ function FeedCard({
             (comment) => comment.post_id === post.id
           );
 
+          const displayName = organization?.name || author?.full_name || "Athlete";
+
+          const metaLine = organization
+            ? `${organization.organization_type || "organization"} · posted by ${
+                author?.full_name || "member"
+              }`
+            : author?.role || "member";
+
           return (
             <div key={post.id} className="rounded-3xl bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">
-                    {author?.full_name || "Athlete"}
+                    {displayName}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    {author?.role || "member"} ·{" "}
+                    {metaLine} ·{" "}
                     {post.created_at
                       ? new Date(post.created_at).toLocaleString()
                       : "Just now"}
@@ -130,7 +185,7 @@ function FeedCard({
 
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                    Post
+                    {organization ? "Organization post" : "Post"}
                   </span>
 
                   {isOwner && (
@@ -176,7 +231,7 @@ function FeedCard({
 
               <div className="mt-5 space-y-3 border-t border-slate-100 pt-4">
                 {postComments.map((comment) => {
-                  const commentAuthor = comment.profiles?.[0];
+                  const commentAuthor = comment.profiles;
                   const canDeleteComment = currentUserId === comment.user_id;
 
                   return (

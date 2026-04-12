@@ -1,288 +1,455 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import ProfileCard from "../components/ProfileCard";
+import FeedCard from "../components/FeedCard";
+import SuggestionsCard from "../components/SuggestionsCard";
 
-type Organization = {
+type DbProfile = {
+  id: string;
+  full_name: string | null;
+  role: string | null;
+  location: string | null;
+  main_sport: string | null;
+};
+
+type RelatedProfile = {
+  full_name: string | null;
+  role: string | null;
+};
+
+type RelatedCommentProfile = {
+  full_name: string | null;
+};
+
+type RelatedOrganization = {
   id: number;
   name: string;
-  organization_type: string;
-  sport: string | null;
-  location: string | null;
-  description: string | null;
-  created_by: string;
+  organization_type: string | null;
+};
+
+type RawPost = {
+  id: number;
+  user_id: string;
+  organization_id: number | null;
+  content: string;
   created_at: string | null;
+  profiles: RelatedProfile | RelatedProfile[] | null;
+  organizations: RelatedOrganization | RelatedOrganization[] | null;
+};
+
+type Post = {
+  id: number;
+  user_id: string;
+  organization_id: number | null;
+  content: string;
+  created_at: string | null;
+  profiles: RelatedProfile | null;
+  organizations: RelatedOrganization | null;
+};
+
+type PostLike = {
+  id: number;
+  post_id: number;
+  user_id: string;
+};
+
+type RawPostComment = {
+  id: number;
+  post_id: number;
+  user_id: string;
+  content: string;
+  created_at: string | null;
+  profiles: RelatedCommentProfile | RelatedCommentProfile[] | null;
+};
+
+type PostComment = {
+  id: number;
+  post_id: number;
+  user_id: string;
+  content: string;
+  created_at: string | null;
+  profiles: RelatedCommentProfile | null;
 };
 
 type MembershipRow = {
   organization_id: number;
+};
+
+type OrganizationNameRow = {
+  name: string;
+};
+
+type ManageableOrganization = {
+  id: number;
+  name: string;
+  organization_type: string | null;
+};
+
+type RawManageableMembershipRow = {
+  organization_id: number;
   member_role: string | null;
+  organizations: ManageableOrganization | ManageableOrganization[] | null;
 };
 
-type JoinRequestRow = {
-  organization_id: number;
-  status: string;
-};
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 
-type MemberCountRow = {
-  organization_id: number;
-};
+function FeedPage() {
+  const [profile, setProfile] = useState({
+    name: "Loading...",
+    role: "Loading...",
+    location: "Loading...",
+    sports: [] as string[],
+    organization: "No organization yet",
+    openTo: ["Teams", "Clubs", "Communities"],
+  });
 
-function OrganizationsPage() {
-  const [loading, setLoading] = useState(true);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [membershipsByOrg, setMembershipsByOrg] = useState<Record<number, string>>({});
-  const [pendingRequestsByOrg, setPendingRequestsByOrg] = useState<Record<number, boolean>>({});
-  const [memberCountsByOrg, setMemberCountsByOrg] = useState<Record<number, number>>({});
-  const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [likes, setLikes] = useState<PostLike[]>([]);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [manageableOrganizations, setManageableOrganizations] = useState<
+    ManageableOrganization[]
+  >([]);
+  const [selectedPublisher, setSelectedPublisher] = useState("me");
+  const [newPost, setNewPost] = useState("");
+  const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({});
+  const [creating, setCreating] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
+  const [likingPostId, setLikingPostId] = useState<number | null>(null);
+  const [commentingPostId, setCommentingPostId] = useState<number | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadOrganizationsPage() {
-      setLoading(true);
-
+    async function loadFeedData() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const { data: orgData, error: orgError } = await supabase
-        .from("organizations")
+      if (!user) return;
+
+      setCurrentUserId(user.id);
+
+      const { data, error } = await supabase
+        .from("profiles")
         .select("*")
-        .order("created_at", { ascending: false });
+        .eq("id", user.id)
+        .single();
 
-      if (orgError) {
-        console.error("Error loading organizations:", orgError.message);
-        setOrganizations([]);
-        setLoading(false);
-        return;
-      }
+      if (error) {
+        console.error("Error loading feed profile:", error.message);
+      } else if (data) {
+        const dbProfile = data as DbProfile;
 
-      const typedOrganizations = (orgData as Organization[]) || [];
-      setOrganizations(typedOrganizations);
+        let firstOrganization = "No organization yet";
 
-      const { data: memberCountRows, error: memberCountError } = await supabase
-        .from("organization_members")
-        .select("organization_id");
-
-      if (memberCountError) {
-        console.error("Error loading member counts:", memberCountError.message);
-        setMemberCountsByOrg({});
-      } else {
-        const countsMap: Record<number, number> = {};
-
-        for (const row of (memberCountRows as MemberCountRow[]) || []) {
-          countsMap[row.organization_id] = (countsMap[row.organization_id] || 0) + 1;
-        }
-
-        setMemberCountsByOrg(countsMap);
-      }
-
-      if (user) {
         const { data: membershipData, error: membershipError } = await supabase
           .from("organization_members")
-          .select("organization_id, member_role")
-          .eq("user_id", user.id);
+          .select("organization_id")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
 
         if (membershipError) {
-          console.error("Error loading memberships:", membershipError.message);
-          setMembershipsByOrg({});
-        } else {
-          const membershipMap: Record<number, string> = {};
+          console.error("Error loading membership:", membershipError.message);
+        } else if (membershipData) {
+          const membership = membershipData as MembershipRow;
 
-          for (const row of (membershipData as MembershipRow[]) || []) {
-            membershipMap[row.organization_id] = row.member_role || "member";
+          const { data: orgData, error: orgError } = await supabase
+            .from("organizations")
+            .select("name")
+            .eq("id", membership.organization_id)
+            .single();
+
+          if (orgError) {
+            console.error("Error loading organization:", orgError.message);
+          } else if (orgData) {
+            const org = orgData as OrganizationNameRow;
+            firstOrganization = org.name;
           }
-
-          setMembershipsByOrg(membershipMap);
         }
 
-        const { data: joinRequestData, error: joinRequestError } = await supabase
-          .from("organization_join_requests")
-          .select("organization_id, status")
-          .eq("user_id", user.id);
-
-        if (joinRequestError) {
-          console.error("Error loading join requests:", joinRequestError.message);
-          setPendingRequestsByOrg({});
-        } else {
-          const pendingMap: Record<number, boolean> = {};
-
-          for (const row of (joinRequestData as JoinRequestRow[]) || []) {
-            if (row.status === "pending") {
-              pendingMap[row.organization_id] = true;
-            }
-          }
-
-          setPendingRequestsByOrg(pendingMap);
-        }
-      } else {
-        setMembershipsByOrg({});
-        setPendingRequestsByOrg({});
+        setProfile({
+          name: dbProfile.full_name || "No name yet",
+          role: dbProfile.role || "No role yet",
+          location: dbProfile.location || "No location yet",
+          sports: dbProfile.main_sport ? [dbProfile.main_sport] : [],
+          organization: firstOrganization,
+          openTo: ["Teams", "Clubs", "Communities"],
+        });
       }
 
-      setLoading(false);
+      const { data: manageableData, error: manageableError } = await supabase
+        .from("organization_members")
+        .select(
+          "organization_id, member_role, organizations(id, name, organization_type)"
+        )
+        .eq("user_id", user.id)
+        .in("member_role", ["owner", "admin"]);
+
+      if (manageableError) {
+        console.error(
+          "Error loading manageable organizations:",
+          manageableError.message
+        );
+        setManageableOrganizations([]);
+      } else {
+        const mappedOrganizations: ManageableOrganization[] = (
+          (manageableData as RawManageableMembershipRow[]) || []
+        )
+          .map((row) => firstRelation(row.organizations))
+          .filter(Boolean) as ManageableOrganization[];
+
+        setManageableOrganizations(mappedOrganizations);
+      }
+
+      await Promise.all([loadPosts(), loadLikes(), loadComments()]);
     }
 
-    loadOrganizationsPage();
+    loadFeedData();
   }, []);
 
-  const filteredOrganizations = useMemo(() => {
-    return organizations.filter((organization) => {
-      const matchesSearch = organization.name
-        .toLowerCase()
-        .includes(searchTerm.trim().toLowerCase());
+  async function loadPosts() {
+    const { data, error } = await supabase
+      .from("posts")
+      .select(
+        "id, user_id, organization_id, content, created_at, profiles(full_name, role), organizations(id, name, organization_type)"
+      )
+      .order("created_at", { ascending: false });
 
-      const matchesType =
-        typeFilter === "all" || organization.organization_type === typeFilter;
+    if (error) {
+      console.error("Error loading posts:", error.message);
+      return;
+    }
 
-      return matchesSearch && matchesType;
+    const normalizedPosts: Post[] = ((data as RawPost[]) || []).map((post) => ({
+      ...post,
+      profiles: firstRelation(post.profiles),
+      organizations: firstRelation(post.organizations),
+    }));
+
+    setPosts(normalizedPosts);
+  }
+
+  async function loadLikes() {
+    const { data, error } = await supabase.from("post_likes").select("*");
+
+    if (error) {
+      console.error("Error loading likes:", error.message);
+      return;
+    }
+
+    setLikes((data as PostLike[]) || []);
+  }
+
+  async function loadComments() {
+    const { data, error } = await supabase
+      .from("post_comments")
+      .select("id, post_id, user_id, content, created_at, profiles(full_name)")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error loading comments:", error.message);
+      return;
+    }
+
+    const normalizedComments: PostComment[] = ((data as RawPostComment[]) || []).map(
+      (comment) => ({
+        ...comment,
+        profiles: firstRelation(comment.profiles),
+      })
+    );
+
+    setComments(normalizedComments);
+  }
+
+  async function handleCreatePost() {
+    if (!newPost.trim() || !currentUserId) return;
+
+    setCreating(true);
+
+    let organizationId: number | null = null;
+
+    if (selectedPublisher.startsWith("org-")) {
+      organizationId = Number(selectedPublisher.replace("org-", ""));
+    }
+
+    const { error } = await supabase.from("posts").insert({
+      user_id: currentUserId,
+      organization_id: organizationId,
+      content: newPost.trim(),
     });
-  }, [organizations, searchTerm, typeFilter]);
+
+    if (error) {
+      console.error("Error creating post:", error.message);
+      setCreating(false);
+      return;
+    }
+
+    setNewPost("");
+    await loadPosts();
+    setCreating(false);
+  }
+
+  async function handleDeletePost(postId: number) {
+    if (!currentUserId) return;
+
+    setDeletingPostId(postId);
+
+    const { error } = await supabase
+      .from("posts")
+      .delete()
+      .eq("id", postId)
+      .eq("user_id", currentUserId);
+
+    if (error) {
+      console.error("Error deleting post:", error.message);
+      setDeletingPostId(null);
+      return;
+    }
+
+    await Promise.all([loadPosts(), loadLikes(), loadComments()]);
+    setDeletingPostId(null);
+  }
+
+  async function handleToggleLike(postId: number) {
+    if (!currentUserId) return;
+
+    setLikingPostId(postId);
+
+    const existingLike = likes.find(
+      (like) => like.post_id === postId && like.user_id === currentUserId
+    );
+
+    if (existingLike) {
+      const { error } = await supabase
+        .from("post_likes")
+        .delete()
+        .eq("id", existingLike.id)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        console.error("Error deleting like:", error.message);
+        setLikingPostId(null);
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("post_likes").insert({
+        post_id: postId,
+        user_id: currentUserId,
+      });
+
+      if (error) {
+        console.error("Error creating like:", error.message);
+        setLikingPostId(null);
+        return;
+      }
+    }
+
+    await loadLikes();
+    setLikingPostId(null);
+  }
+
+  async function handleAddComment(postId: number) {
+    if (!currentUserId) return;
+
+    const content = (commentDrafts[postId] || "").trim();
+    if (!content) return;
+
+    setCommentingPostId(postId);
+
+    const { error } = await supabase.from("post_comments").insert({
+      post_id: postId,
+      user_id: currentUserId,
+      content,
+    });
+
+    if (error) {
+      console.error("Error creating comment:", error.message);
+      setCommentingPostId(null);
+      return;
+    }
+
+    setCommentDrafts((prev) => ({
+      ...prev,
+      [postId]: "",
+    }));
+
+    await loadComments();
+    setCommentingPostId(null);
+  }
+
+  async function handleDeleteComment(commentId: number) {
+    if (!currentUserId) return;
+
+    setDeletingCommentId(commentId);
+
+    const { error } = await supabase
+      .from("post_comments")
+      .delete()
+      .eq("id", commentId)
+      .eq("user_id", currentUserId);
+
+    if (error) {
+      console.error("Error deleting comment:", error.message);
+      setDeletingCommentId(null);
+      return;
+    }
+
+    await loadComments();
+    setDeletingCommentId(null);
+  }
+
+  const suggestions = [
+    {
+      id: 1,
+      name: "FC Lugano U21",
+      meta: "Football Team · Lugano",
+    },
+    {
+      id: 2,
+      name: "Padel Brothers Ticino",
+      meta: "Community · Lugano",
+    },
+    {
+      id: 3,
+      name: "Coach Elena Rossi",
+      meta: "Volleyball Coach · Switzerland",
+    },
+  ];
 
   return (
-    <main className="px-6 py-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">
-                Discover
-              </p>
-              <h1 className="mt-2 text-3xl font-bold text-slate-900">
-                Organizations
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                Find teams, clubs, and communities on Asobu. Open a page to learn
-                more, send a join request, or manage the organization if you are an
-                admin.
-              </p>
-            </div>
-
-            <Link
-              to="/profile"
-              className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Create organization from profile
-            </Link>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="xl:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Search by name
-              </label>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search organizations..."
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Filter by type
-              </label>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-              >
-                <option value="all">All</option>
-                <option value="team">Team</option>
-                <option value="club">Club</option>
-                <option value="community">Community</option>
-              </select>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Results</p>
-              <p className="mt-2 text-2xl font-bold text-slate-900">
-                {filteredOrganizations.length}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          {loading ? (
-            <p className="text-sm text-slate-500">Loading organizations...</p>
-          ) : filteredOrganizations.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
-              <h2 className="text-lg font-semibold text-slate-900">
-                No organizations found
-              </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Try a different search or change the filter.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredOrganizations.map((organization) => {
-                const myRole = membershipsByOrg[organization.id] || null;
-                const hasPendingRequest = pendingRequestsByOrg[organization.id] || false;
-                const memberCount = memberCountsByOrg[organization.id] || 0;
-
-                return (
-                  <Link
-                    key={organization.id}
-                    to={`/organizations/${organization.id}`}
-                    className="rounded-3xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="text-xl font-semibold text-slate-900">
-                          {organization.name}
-                        </h2>
-                        <p className="mt-1 text-sm font-medium text-slate-600">
-                          {organization.organization_type}
-                        </p>
-                      </div>
-
-                      {myRole ? (
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-                          {myRole}
-                        </span>
-                      ) : hasPendingRequest ? (
-                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-                          pending
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                          not joined
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {organization.sport && (
-                        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                          {organization.sport}
-                        </span>
-                      )}
-
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        {memberCount} members
-                      </span>
-                    </div>
-
-                    <p className="mt-4 text-sm leading-7 text-slate-600">
-                      {organization.description || "No description yet."}
-                    </p>
-
-                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-500">
-                      <span>{organization.location || "No location"}</span>
-                      <span className="font-medium text-slate-700">Open page</span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </div>
+    <main className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[290px_minmax(0,1fr)_280px]">
+      <ProfileCard profile={profile} />
+      <FeedCard
+        posts={posts}
+        likes={likes}
+        comments={comments}
+        manageableOrganizations={manageableOrganizations}
+        selectedPublisher={selectedPublisher}
+        setSelectedPublisher={setSelectedPublisher}
+        currentProfileName={profile.name}
+        newPost={newPost}
+        setNewPost={setNewPost}
+        onCreatePost={handleCreatePost}
+        onDeletePost={handleDeletePost}
+        onToggleLike={handleToggleLike}
+        onAddComment={handleAddComment}
+        onDeleteComment={handleDeleteComment}
+        commentDrafts={commentDrafts}
+        setCommentDrafts={setCommentDrafts}
+        creating={creating}
+        deletingPostId={deletingPostId}
+        likingPostId={likingPostId}
+        commentingPostId={commentingPostId}
+        deletingCommentId={deletingCommentId}
+        currentUserId={currentUserId}
+      />
+      <SuggestionsCard suggestions={suggestions} />
     </main>
   );
 }
 
-export default OrganizationsPage;
+export default FeedPage;

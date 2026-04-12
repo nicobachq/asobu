@@ -12,15 +12,39 @@ type DbProfile = {
   main_sport: string | null;
 };
 
+type RelatedProfile = {
+  full_name: string | null;
+  role: string | null;
+};
+
+type RelatedCommentProfile = {
+  full_name: string | null;
+};
+
+type RelatedOrganization = {
+  id: number;
+  name: string;
+  organization_type: string | null;
+};
+
+type RawPost = {
+  id: number;
+  user_id: string;
+  organization_id: number | null;
+  content: string;
+  created_at: string | null;
+  profiles: RelatedProfile | RelatedProfile[] | null;
+  organizations: RelatedOrganization | RelatedOrganization[] | null;
+};
+
 type Post = {
   id: number;
   user_id: string;
+  organization_id: number | null;
   content: string;
   created_at: string | null;
-  profiles: {
-    full_name: string | null;
-    role: string | null;
-  }[];
+  profiles: RelatedProfile | null;
+  organizations: RelatedOrganization | null;
 };
 
 type PostLike = {
@@ -29,15 +53,22 @@ type PostLike = {
   user_id: string;
 };
 
+type RawPostComment = {
+  id: number;
+  post_id: number;
+  user_id: string;
+  content: string;
+  created_at: string | null;
+  profiles: RelatedCommentProfile | RelatedCommentProfile[] | null;
+};
+
 type PostComment = {
   id: number;
   post_id: number;
   user_id: string;
   content: string;
   created_at: string | null;
-  profiles: {
-    full_name: string | null;
-  }[];
+  profiles: RelatedCommentProfile | null;
 };
 
 type MembershipRow = {
@@ -47,6 +78,23 @@ type MembershipRow = {
 type OrganizationNameRow = {
   name: string;
 };
+
+type ManageableOrganization = {
+  id: number;
+  name: string;
+  organization_type: string | null;
+};
+
+type RawManageableMembershipRow = {
+  organization_id: number;
+  member_role: string | null;
+  organizations: ManageableOrganization | ManageableOrganization[] | null;
+};
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 
 function FeedPage() {
   const [profile, setProfile] = useState({
@@ -61,6 +109,10 @@ function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [likes, setLikes] = useState<PostLike[]>([]);
   const [comments, setComments] = useState<PostComment[]>([]);
+  const [manageableOrganizations, setManageableOrganizations] = useState<
+    ManageableOrganization[]
+  >([]);
+  const [selectedPublisher, setSelectedPublisher] = useState("me");
   const [newPost, setNewPost] = useState("");
   const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({});
   const [creating, setCreating] = useState(false);
@@ -129,6 +181,30 @@ function FeedPage() {
         });
       }
 
+      const { data: manageableData, error: manageableError } = await supabase
+        .from("organization_members")
+        .select(
+          "organization_id, member_role, organizations(id, name, organization_type)"
+        )
+        .eq("user_id", user.id)
+        .in("member_role", ["owner", "admin"]);
+
+      if (manageableError) {
+        console.error(
+          "Error loading manageable organizations:",
+          manageableError.message
+        );
+        setManageableOrganizations([]);
+      } else {
+        const mappedOrganizations: ManageableOrganization[] = (
+          (manageableData as RawManageableMembershipRow[]) || []
+        )
+          .map((row) => firstRelation(row.organizations))
+          .filter(Boolean) as ManageableOrganization[];
+
+        setManageableOrganizations(mappedOrganizations);
+      }
+
       await Promise.all([loadPosts(), loadLikes(), loadComments()]);
     }
 
@@ -138,7 +214,9 @@ function FeedPage() {
   async function loadPosts() {
     const { data, error } = await supabase
       .from("posts")
-      .select("id, user_id, content, created_at, profiles(full_name, role)")
+      .select(
+        "id, user_id, organization_id, content, created_at, profiles(full_name, role), organizations(id, name, organization_type)"
+      )
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -146,7 +224,13 @@ function FeedPage() {
       return;
     }
 
-    setPosts((data as Post[]) || []);
+    const normalizedPosts: Post[] = ((data as RawPost[]) || []).map((post) => ({
+      ...post,
+      profiles: firstRelation(post.profiles),
+      organizations: firstRelation(post.organizations),
+    }));
+
+    setPosts(normalizedPosts);
   }
 
   async function loadLikes() {
@@ -171,7 +255,14 @@ function FeedPage() {
       return;
     }
 
-    setComments((data as PostComment[]) || []);
+    const normalizedComments: PostComment[] = ((data as RawPostComment[]) || []).map(
+      (comment) => ({
+        ...comment,
+        profiles: firstRelation(comment.profiles),
+      })
+    );
+
+    setComments(normalizedComments);
   }
 
   async function handleCreatePost() {
@@ -179,8 +270,15 @@ function FeedPage() {
 
     setCreating(true);
 
+    let organizationId: number | null = null;
+
+    if (selectedPublisher.startsWith("org-")) {
+      organizationId = Number(selectedPublisher.replace("org-", ""));
+    }
+
     const { error } = await supabase.from("posts").insert({
       user_id: currentUserId,
+      organization_id: organizationId,
       content: newPost.trim(),
     });
 
@@ -329,6 +427,10 @@ function FeedPage() {
         posts={posts}
         likes={likes}
         comments={comments}
+        manageableOrganizations={manageableOrganizations}
+        selectedPublisher={selectedPublisher}
+        setSelectedPublisher={setSelectedPublisher}
+        currentProfileName={profile.name}
         newPost={newPost}
         setNewPost={setNewPost}
         onCreatePost={handleCreatePost}
