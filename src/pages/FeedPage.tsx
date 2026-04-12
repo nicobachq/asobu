@@ -25,6 +25,7 @@ type RelatedOrganization = {
   id: number;
   name: string;
   organization_type: string | null;
+  logo_url: string | null;
 };
 
 type RawPost = {
@@ -83,6 +84,7 @@ type ManageableOrganization = {
   id: number;
   name: string;
   organization_type: string | null;
+  logo_url: string | null;
 };
 
 type RawManageableMembershipRow = {
@@ -184,7 +186,7 @@ function FeedPage() {
       const { data: manageableData, error: manageableError } = await supabase
         .from("organization_members")
         .select(
-          "organization_id, member_role, organizations(id, name, organization_type)"
+          "organization_id, member_role, organizations(id, name, organization_type, logo_url)"
         )
         .eq("user_id", user.id)
         .in("member_role", ["owner", "admin"]);
@@ -215,7 +217,7 @@ function FeedPage() {
     const { data, error } = await supabase
       .from("posts")
       .select(
-        "id, user_id, organization_id, content, created_at, profiles(full_name, role), organizations(id, name, organization_type)"
+        "id, user_id, organization_id, content, created_at, profiles(full_name, role), organizations(id, name, organization_type, logo_url)"
       )
       .order("created_at", { ascending: false });
 

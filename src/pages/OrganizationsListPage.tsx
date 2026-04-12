@@ -11,6 +11,8 @@ type Organization = {
   description: string | null;
   created_by: string;
   created_at: string | null;
+  logo_url: string | null;
+  cover_image_url: string | null;
 };
 
 type MembershipRow = {
@@ -26,6 +28,17 @@ type JoinRequestRow = {
 type MemberCountRow = {
   organization_id: number;
 };
+
+function getInitials(name: string) {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() || "")
+      .join("") || "O"
+  );
+}
 
 function OrganizationsListPage() {
   const [loading, setLoading] = useState(true);
@@ -127,9 +140,11 @@ function OrganizationsListPage() {
 
   const filteredOrganizations = useMemo(() => {
     return organizations.filter((organization) => {
-      const matchesSearch = organization.name
-        .toLowerCase()
-        .includes(searchTerm.trim().toLowerCase());
+      const normalizedSearch = searchTerm.trim().toLowerCase();
+      const matchesSearch =
+        organization.name.toLowerCase().includes(normalizedSearch) ||
+        (organization.location || "").toLowerCase().includes(normalizedSearch) ||
+        (organization.sport || "").toLowerCase().includes(normalizedSearch);
 
       const matchesType =
         typeFilter === "all" || organization.organization_type === typeFilter;
@@ -168,7 +183,7 @@ function OrganizationsListPage() {
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="xl:col-span-2">
               <label className="mb-2 block text-sm font-medium text-slate-700">
-                Search by name
+                Search by name, sport, or location
               </label>
               <input
                 type="text"
@@ -227,52 +242,83 @@ function OrganizationsListPage() {
                   <Link
                     key={organization.id}
                     to={`/organizations/${organization.id}`}
-                    className="rounded-3xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 hover:bg-slate-50"
+                    className="overflow-hidden rounded-3xl border border-slate-200 bg-white transition hover:border-slate-300 hover:bg-slate-50"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="text-xl font-semibold text-slate-900">
-                          {organization.name}
-                        </h2>
-                        <p className="mt-1 text-sm font-medium text-slate-600">
-                          {organization.organization_type}
-                        </p>
+                    <div
+                      className="h-28 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+                      style={
+                        organization.cover_image_url
+                          ? {
+                              backgroundImage: `url(${organization.cover_image_url})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                            }
+                          : undefined
+                      }
+                    />
+
+                    <div className="p-5">
+                      <div className="-mt-11 flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-white shadow-sm">
+                            {organization.logo_url ? (
+                              <img
+                                src={organization.logo_url}
+                                alt={organization.name}
+                                className="h-full w-full rounded-[1.1rem] object-contain p-2"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
+                                {getInitials(organization.name)}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 pt-10">
+                            <h2 className="truncate text-xl font-semibold text-slate-900">
+                              {organization.name}
+                            </h2>
+                            <p className="mt-1 text-sm font-medium text-slate-600">
+                              {organization.organization_type}
+                            </p>
+                          </div>
+                        </div>
+
+                        {myRole ? (
+                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                            {myRole}
+                          </span>
+                        ) : hasPendingRequest ? (
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+                            pending
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                            not joined
+                          </span>
+                        )}
                       </div>
 
-                      {myRole ? (
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-                          {myRole}
-                        </span>
-                      ) : hasPendingRequest ? (
-                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-                          pending
-                        </span>
-                      ) : (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {organization.sport && (
+                          <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                            {organization.sport}
+                          </span>
+                        )}
+
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                          not joined
+                          {memberCount} members
                         </span>
-                      )}
-                    </div>
+                      </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {organization.sport && (
-                        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                          {organization.sport}
-                        </span>
-                      )}
+                      <p className="mt-4 line-clamp-3 text-sm leading-7 text-slate-600">
+                        {organization.description || "No description yet."}
+                      </p>
 
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        {memberCount} members
-                      </span>
-                    </div>
-
-                    <p className="mt-4 text-sm leading-7 text-slate-600">
-                      {organization.description || "No description yet."}
-                    </p>
-
-                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-500">
-                      <span>{organization.location || "No location"}</span>
-                      <span className="font-medium text-slate-700">Open page</span>
+                      <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-500">
+                        <span>{organization.location || "No location"}</span>
+                        <span className="font-medium text-slate-700">Open page</span>
+                      </div>
                     </div>
                   </Link>
                 );

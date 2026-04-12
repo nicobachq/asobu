@@ -13,6 +13,7 @@ type Post = {
   organizations: {
     name: string;
     organization_type: string | null;
+    logo_url: string | null;
   } | null;
 };
 
@@ -37,6 +38,7 @@ type ManageableOrganization = {
   id: number;
   name: string;
   organization_type: string | null;
+  logo_url: string | null;
 };
 
 type FeedCardProps = {
@@ -64,6 +66,17 @@ type FeedCardProps = {
   currentUserId: string | null;
 };
 
+function getInitials(name: string) {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() || "")
+      .join("") || "A"
+  );
+}
+
 function FeedCard({
   posts,
   likes,
@@ -88,6 +101,12 @@ function FeedCard({
   deletingCommentId,
   currentUserId,
 }: FeedCardProps) {
+  const selectedOrganization = selectedPublisher.startsWith("org-")
+    ? manageableOrganizations.find(
+        (organization) => organization.id === Number(selectedPublisher.replace("org-", ""))
+      ) || null
+    : null;
+
   return (
     <div className="space-y-5">
       <div className="rounded-3xl bg-white p-5 shadow-sm">
@@ -122,6 +141,33 @@ function FeedCard({
             />
           </div>
         </div>
+
+        {selectedOrganization && (
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white">
+              {selectedOrganization.logo_url ? (
+                <img
+                  src={selectedOrganization.logo_url}
+                  alt={selectedOrganization.name}
+                  className="h-full w-full rounded-full object-contain p-1.5"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                  {getInitials(selectedOrganization.name)}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-slate-900">
+                Posting as {selectedOrganization.name}
+              </p>
+              <p className="text-xs text-slate-500">
+                {selectedOrganization.organization_type || "organization"}
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 flex items-center justify-between gap-4">
           <div className="flex flex-wrap gap-3">
@@ -171,16 +217,32 @@ function FeedCard({
           return (
             <div key={post.id} className="rounded-3xl bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    {displayName}
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {metaLine} ·{" "}
-                    {post.created_at
-                      ? new Date(post.created_at).toLocaleString()
-                      : "Just now"}
-                  </p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white">
+                    {organization?.logo_url ? (
+                      <img
+                        src={organization.logo_url}
+                        alt={organization.name}
+                        className="h-full w-full rounded-full object-contain p-1.5"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                        {getInitials(displayName)}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-semibold text-slate-900">
+                      {displayName}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {metaLine} ·{" "}
+                      {post.created_at
+                        ? new Date(post.created_at).toLocaleString()
+                        : "Just now"}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -200,9 +262,7 @@ function FeedCard({
                 </div>
               </div>
 
-              <p className="mt-4 text-sm leading-7 text-slate-700">
-                {post.content}
-              </p>
+              <p className="mt-4 text-sm leading-7 text-slate-700">{post.content}</p>
 
               <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
                 <span>{postLikes.length} likes</span>
@@ -255,9 +315,7 @@ function FeedCard({
                             disabled={deletingCommentId === comment.id}
                             className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                           >
-                            {deletingCommentId === comment.id
-                              ? "Deleting..."
-                              : "Delete"}
+                            {deletingCommentId === comment.id ? "Deleting..." : "Delete"}
                           </button>
                         )}
                       </div>
