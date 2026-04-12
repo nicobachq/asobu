@@ -141,6 +141,10 @@ type ProfileLookupRow = {
   main_sport: string | null;
 };
 
+type TransferOwnershipRpcResponse = {
+  success: boolean;
+};
+
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
@@ -178,6 +182,8 @@ function OrganizationPage() {
   const [orgDescription, setOrgDescription] = useState("");
   const [savingOrganization, setSavingOrganization] = useState(false);
   const [leavingOrganization, setLeavingOrganization] = useState(false);
+  const [transferTargetUserId, setTransferTargetUserId] = useState("");
+  const [transferringOwnership, setTransferringOwnership] = useState(false);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [likes, setLikes] = useState<PostLike[]>([]);
@@ -199,6 +205,28 @@ function OrganizationPage() {
   const canEditOrganization = canManageOrganization;
   const canManageMembers = myMembershipRole === "owner";
   const canSelfLeave = myMembershipRole === "member" || myMembershipRole === "admin";
+
+  const ownershipTransferCandidates = useMemo(
+    () =>
+      members.filter(
+        (member) => member.user_id !== authUserId && member.member_role !== "owner"
+      ),
+    [members, authUserId]
+  );
+
+  useEffect(() => {
+    if (ownershipTransferCandidates.length === 0) {
+      setTransferTargetUserId("");
+      return;
+    }
+
+    setTransferTargetUserId((current) => {
+      const stillExists = ownershipTransferCandidates.some(
+        (member) => member.user_id === current
+      );
+      return stillExists ? current : ownershipTransferCandidates[0].user_id;
+    });
+  }, [ownershipTransferCandidates]);
 
   useEffect(() => {
     let isMounted = true;
@@ -748,6 +776,45 @@ function OrganizationPage() {
     setProcessingMemberId(null);
   }
 
+  async function handleTransferOwnership() {
+    if (!organizationId || !canManageMembers || !transferTargetUserId) return;
+
+    setTransferringOwnership(true);
+    setPageError("");
+    setPageMessage("");
+
+    const { data, error } = await supabase.rpc("transfer_organization_ownership", {
+      p_organization_id: organizationId,
+      p_new_owner_user_id: transferTargetUserId,
+    });
+
+    if (error) {
+      console.error("Error transferring ownership:", error.message);
+      setPageError(`Error: ${error.message}`);
+      setTransferringOwnership(false);
+      return;
+    }
+
+    const rpcResponse = Array.isArray(data)
+      ? ((data[0] as TransferOwnershipRpcResponse | undefined) ?? { success: true })
+      : ((data as TransferOwnershipRpcResponse | null) ?? { success: true });
+
+    if (!rpcResponse.success) {
+      setPageError("Ownership transfer failed.");
+      setTransferringOwnership(false);
+      return;
+    }
+
+    setPageMessage(
+      "Ownership transferred. You are now an admin and can leave the organization if needed."
+    );
+    await Promise.all([
+      refreshOrganizationSection(),
+      authUserId ? loadCurrentUserProfile(authUserId) : Promise.resolve(),
+    ]);
+    setTransferringOwnership(false);
+  }
+
   async function handleLeaveOrganization() {
     if (!authUserId || !organizationId || !canSelfLeave) return;
 
@@ -1222,6 +1289,59 @@ function OrganizationPage() {
           </section>
         )}
 
+        {canManageMembers && (
+          <section className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Ownership transfer
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Transfer this organization to an existing member or admin. After transfer,
+                  you become an admin and can leave the organization if needed.
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                owner only
+              </span>
+            </div>
+
+            {ownershipTransferCandidates.length === 0 ? (
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                You need at least one other member or admin before you can transfer ownership.
+              </div>
+            ) : (
+              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    New owner
+                  </label>
+                  <select
+                    value={transferTargetUserId}
+                    onChange={(e) => setTransferTargetUserId(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  >
+                    {ownershipTransferCandidates.map((member) => (
+                      <option key={member.user_id} value={member.user_id}>
+                        {(member.profiles?.full_name || member.user_id) +
+                          ` — ${member.member_role}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleTransferOwnership}
+                  disabled={transferringOwnership || !transferTargetUserId}
+                  className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {transferringOwnership ? "Transferring..." : "Transfer ownership"}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
         {canManageOrganization && (
           <section className="rounded-3xl bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-4">
@@ -1609,13 +1729,13 @@ function OrganizationPage() {
 
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
             {canManageMembers
-              ? "You can edit organization details, review join requests, promote or remove members, and publish organization posts on this page."
+              ? "You can edit organization details, transfer ownership, review join requests, promote or remove members, and publish organization posts on this page."
               : canManageOrganization
-              ? "You can edit organization details, review join requests, publish organization posts, and leave the organization yourself. Member role changes stay limited to the owner."
+              ? "You can edit organization details, review join requests, publish organization posts, and leave the organization yourself. Member role changes and ownership transfer stay limited to the owner."
               : canSelfLeave
               ? "You are a member of this organization and can leave it at any time from the top action buttons."
               : myMembershipRole === "owner"
-              ? "You are the owner of this organization. Leaving is disabled until ownership transfer is supported."
+              ? "You are the owner of this organization. Transfer ownership first if you want to leave later."
               : "You can read the organization page and interact with posts, but management actions stay limited to admins and owners."}
           </div>
         </section>
