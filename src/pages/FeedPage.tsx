@@ -12,6 +12,17 @@ type DbProfile = {
   main_sport: string | null;
 };
 
+type Post = {
+  id: number;
+  user_id: string;
+  content: string;
+  created_at: string | null;
+  profiles: {
+    full_name: string | null;
+    role: string | null;
+  }[];
+};
+
 function FeedPage() {
   const [profile, setProfile] = useState({
     name: "Loading...",
@@ -22,61 +33,82 @@ function FeedPage() {
     openTo: ["Teams", "Clubs", "Communities"],
   });
 
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [newPost, setNewPost] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   useEffect(() => {
-    async function loadProfile() {
+    async function loadFeedData() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) return;
 
+      setCurrentUserId(user.id);
+
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
-        .single<DbProfile>();
+        .single();
 
       if (error) {
         console.error("Error loading feed profile:", error.message);
-        return;
+      } else if (data) {
+        const dbProfile = data as DbProfile;
+
+        setProfile({
+          name: dbProfile.full_name || "No name yet",
+          role: dbProfile.role || "No role yet",
+          location: dbProfile.location || "No location yet",
+          sports: dbProfile.main_sport ? [dbProfile.main_sport] : [],
+          organization: "No organization yet",
+          openTo: ["Teams", "Clubs", "Communities"],
+        });
       }
 
-      setProfile({
-        name: data.full_name || "No name yet",
-        role: data.role || "No role yet",
-        location: data.location || "No location yet",
-        sports: data.main_sport ? [data.main_sport] : [],
-        organization: "No organization yet",
-        openTo: ["Teams", "Clubs", "Communities"],
-      });
+      await loadPosts();
     }
 
-    loadProfile();
+    loadFeedData();
   }, []);
 
-  const posts = [
-    {
-      id: 1,
-      author: "Luca Bianchi",
-      meta: "Football Player · 2h",
-      content:
-        "Great match today. Happy with the result and the team spirit. Looking forward to the next game.",
-    },
-    {
-      id: 2,
-      author: "Padel Brothers Ticino",
-      meta: "Community · 5h",
-      content:
-        "New community session this Sunday in Lugano. Open to players of different levels.",
-    },
-    {
-      id: 3,
-      author: "Coach Elena Rossi",
-      meta: "Volleyball Coach · 8h",
-      content:
-        "Looking for disciplined young athletes with strong attitude and good game intelligence.",
-    },
-  ];
+  async function loadPosts() {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("id, user_id, content, created_at, profiles(full_name, role)")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error loading posts:", error.message);
+      return;
+    }
+
+    setPosts((data as Post[]) || []);
+  }
+
+  async function handleCreatePost() {
+    if (!newPost.trim() || !currentUserId) return;
+
+    setCreating(true);
+
+    const { error } = await supabase.from("posts").insert({
+      user_id: currentUserId,
+      content: newPost.trim(),
+    });
+
+    if (error) {
+      console.error("Error creating post:", error.message);
+      setCreating(false);
+      return;
+    }
+
+    setNewPost("");
+    await loadPosts();
+    setCreating(false);
+  }
 
   const suggestions = [
     {
@@ -99,7 +131,13 @@ function FeedPage() {
   return (
     <main className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[290px_minmax(0,1fr)_280px]">
       <ProfileCard profile={profile} />
-      <FeedCard posts={posts} />
+      <FeedCard
+        posts={posts}
+        newPost={newPost}
+        setNewPost={setNewPost}
+        onCreatePost={handleCreatePost}
+        creating={creating}
+      />
       <SuggestionsCard suggestions={suggestions} />
     </main>
   );
