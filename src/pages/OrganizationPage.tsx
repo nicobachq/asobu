@@ -177,6 +177,7 @@ function OrganizationPage() {
   const [orgLocation, setOrgLocation] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
   const [savingOrganization, setSavingOrganization] = useState(false);
+  const [leavingOrganization, setLeavingOrganization] = useState(false);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [likes, setLikes] = useState<PostLike[]>([]);
@@ -197,6 +198,7 @@ function OrganizationPage() {
     myMembershipRole === "owner" || myMembershipRole === "admin";
   const canEditOrganization = canManageOrganization;
   const canManageMembers = myMembershipRole === "owner";
+  const canSelfLeave = myMembershipRole === "member" || myMembershipRole === "admin";
 
   useEffect(() => {
     let isMounted = true;
@@ -746,6 +748,35 @@ function OrganizationPage() {
     setProcessingMemberId(null);
   }
 
+  async function handleLeaveOrganization() {
+    if (!authUserId || !organizationId || !canSelfLeave) return;
+
+    setLeavingOrganization(true);
+    setPageMessage("");
+    setPageError("");
+    setEditMode(false);
+
+    const { error } = await supabase
+      .from("organization_members")
+      .delete()
+      .eq("organization_id", organizationId)
+      .eq("user_id", authUserId);
+
+    if (error) {
+      console.error("Error leaving organization:", error.message);
+      setPageError(`Error: ${error.message}`);
+      setLeavingOrganization(false);
+      return;
+    }
+
+    setPageMessage("You left the organization.");
+    await Promise.all([
+      refreshOrganizationSection(),
+      loadCurrentUserProfile(authUserId),
+    ]);
+    setLeavingOrganization(false);
+  }
+
   async function handleCreateOrganizationPost() {
     if (!authUserId || !organizationId || !newPost.trim() || !canManageOrganization) {
       return;
@@ -998,6 +1029,16 @@ function OrganizationPage() {
                     className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
                   >
                     Edit organization
+                  </button>
+                )}
+
+                {canSelfLeave && (
+                  <button
+                    onClick={handleLeaveOrganization}
+                    disabled={leavingOrganization}
+                    className="rounded-2xl border border-red-200 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    {leavingOrganization ? "Leaving..." : "Leave organization"}
                   </button>
                 )}
 
@@ -1265,8 +1306,10 @@ function OrganizationPage() {
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               {members.map((member) => {
                 const isThisUser = member.user_id === authUserId;
-                const canPromote = canManageMembers && !isThisUser && member.member_role === "member";
-                const canDemote = canManageMembers && !isThisUser && member.member_role === "admin";
+                const canPromote =
+                  canManageMembers && !isThisUser && member.member_role === "member";
+                const canDemote =
+                  canManageMembers && !isThisUser && member.member_role === "admin";
                 const canRemove =
                   canManageMembers && !isThisUser && member.member_role !== "owner";
 
@@ -1568,7 +1611,11 @@ function OrganizationPage() {
             {canManageMembers
               ? "You can edit organization details, review join requests, promote or remove members, and publish organization posts on this page."
               : canManageOrganization
-              ? "You can edit organization details, review join requests, and publish organization posts on this page. Member role changes stay limited to the owner."
+              ? "You can edit organization details, review join requests, publish organization posts, and leave the organization yourself. Member role changes stay limited to the owner."
+              : canSelfLeave
+              ? "You are a member of this organization and can leave it at any time from the top action buttons."
+              : myMembershipRole === "owner"
+              ? "You are the owner of this organization. Leaving is disabled until ownership transfer is supported."
               : "You can read the organization page and interact with posts, but management actions stay limited to admins and owners."}
           </div>
         </section>
