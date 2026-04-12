@@ -40,6 +40,14 @@ type PostComment = {
   }[];
 };
 
+type MembershipRow = {
+  organization_id: number;
+};
+
+type OrganizationNameRow = {
+  name: string;
+};
+
 function FeedPage() {
   const [profile, setProfile] = useState({
     name: "Loading...",
@@ -83,12 +91,40 @@ function FeedPage() {
       } else if (data) {
         const dbProfile = data as DbProfile;
 
+        let firstOrganization = "No organization yet";
+
+        const { data: membershipData, error: membershipError } = await supabase
+          .from("organization_members")
+          .select("organization_id")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (membershipError) {
+          console.error("Error loading membership:", membershipError.message);
+        } else if (membershipData) {
+          const membership = membershipData as MembershipRow;
+
+          const { data: orgData, error: orgError } = await supabase
+            .from("organizations")
+            .select("name")
+            .eq("id", membership.organization_id)
+            .single();
+
+          if (orgError) {
+            console.error("Error loading organization:", orgError.message);
+          } else if (orgData) {
+            const org = orgData as OrganizationNameRow;
+            firstOrganization = org.name;
+          }
+        }
+
         setProfile({
           name: dbProfile.full_name || "No name yet",
           role: dbProfile.role || "No role yet",
           location: dbProfile.location || "No location yet",
           sports: dbProfile.main_sport ? [dbProfile.main_sport] : [],
-          organization: "No organization yet",
+          organization: firstOrganization,
           openTo: ["Teams", "Clubs", "Communities"],
         });
       }
@@ -114,9 +150,7 @@ function FeedPage() {
   }
 
   async function loadLikes() {
-    const { data, error } = await supabase
-      .from("post_likes")
-      .select("*");
+    const { data, error } = await supabase.from("post_likes").select("*");
 
     if (error) {
       console.error("Error loading likes:", error.message);
