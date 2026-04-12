@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ProfileCard from "../components/ProfileCard";
@@ -462,7 +462,9 @@ function OrganizationPage() {
 
     const { data: memberRows, error: memberError } = await supabase
       .from("organization_members")
-      .select("id, user_id, member_role, created_at, profiles(full_name, role, location, main_sport)")
+      .select(
+        "id, user_id, member_role, created_at, profiles(full_name, role, location, main_sport)"
+      )
       .eq("organization_id", orgId)
       .order("created_at", { ascending: true });
 
@@ -503,10 +505,11 @@ function OrganizationPage() {
         let profilesById: Record<string, RelatedProfile> = {};
 
         if (requesterIds.length > 0) {
-          const { data: requesterProfiles, error: requesterProfilesError } = await supabase
-            .from("profiles")
-            .select("id, full_name, role, location, main_sport")
-            .in("id", requesterIds);
+          const { data: requesterProfiles, error: requesterProfilesError } =
+            await supabase
+              .from("profiles")
+              .select("id, full_name, role, location, main_sport")
+              .in("id", requesterIds);
 
           if (requesterProfilesError) {
             console.error(
@@ -626,7 +629,7 @@ function OrganizationPage() {
     setPageMessage("");
   }
 
-  function handleLogoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleLogoFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
 
@@ -650,7 +653,7 @@ function OrganizationPage() {
     setLogoPreviewUrl(nextPreviewUrl);
   }
 
-  function handleCoverFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleCoverFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
 
@@ -1181,6 +1184,19 @@ function OrganizationPage() {
     return "You are not a member yet";
   }, [myMembershipRole, hasPendingRequest]);
 
+  const solidSecondaryButton =
+    "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50";
+  const solidDangerButton =
+    "rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50";
+  const solidPrimaryButton =
+    "rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-60";
+  const smallPrimaryButton =
+    "rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-60";
+  const smallSecondaryButton =
+    "rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60";
+  const smallDangerButton =
+    "rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-60";
+
   if (loading) {
     return (
       <main className="px-6 py-6">
@@ -1200,16 +1216,10 @@ function OrganizationPage() {
             {pageError || "Organization not found."}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              to="/organizations"
-              className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
-            >
+            <Link to="/organizations" className={solidPrimaryButton}>
               Back to organizations
             </Link>
-            <Link
-              to="/"
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
+            <Link to="/" className={solidSecondaryButton}>
               Back to feed
             </Link>
           </div>
@@ -1227,7 +1237,7 @@ function OrganizationPage() {
       <div className="space-y-5">
         <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
           <div
-            className="h-44 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+            className="h-56 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
             style={
               organization.cover_image_url
                 ? {
@@ -1239,26 +1249,28 @@ function OrganizationPage() {
             }
           />
 
-          <div className="p-6">
-            <div className="-mt-20 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex items-start gap-4">
-                {organization.logo_url ? (
-                  <img
-                    src={organization.logo_url}
-                    alt={organization.name}
-                    className="h-24 w-24 rounded-3xl border-4 border-white bg-white object-cover shadow-md"
-                  />
-                ) : (
-                  <div className="flex h-24 w-24 items-center justify-center rounded-3xl border-4 border-white bg-slate-900 text-xl font-semibold text-white shadow-md">
-                    {getInitials(organization.name)}
-                  </div>
-                )}
+          <div className="px-6 pb-6">
+            <div className="-mt-14 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex min-w-0 items-end gap-4">
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-white shadow-md">
+                  {organization.logo_url ? (
+                    <img
+                      src={organization.logo_url}
+                      alt={organization.name}
+                      className="h-full w-full rounded-[1.1rem] object-contain p-2"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-xl font-semibold text-white">
+                      {getInitials(organization.name)}
+                    </div>
+                  )}
+                </div>
 
-                <div className="pt-20 lg:pt-0">
+                <div className="min-w-0 pt-2">
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">
                     Organization
                   </p>
-                  <h1 className="mt-2 text-3xl font-bold text-slate-900">
+                  <h1 className="mt-2 text-3xl font-bold leading-tight text-slate-900">
                     {organization.name}
                   </h1>
                   <p className="mt-2 text-sm font-medium text-slate-600">
@@ -1270,7 +1282,7 @@ function OrganizationPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 lg:justify-end">
                 {myMembershipRole ? (
                   <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700">
                     {myMembershipRole}
@@ -1283,7 +1295,7 @@ function OrganizationPage() {
                   <button
                     onClick={handleJoinRequest}
                     disabled={joiningOrganization}
-                    className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                    className={solidPrimaryButton}
                   >
                     {joiningOrganization ? "Sending..." : "Request to join"}
                   </button>
@@ -1296,7 +1308,7 @@ function OrganizationPage() {
                       setPageError("");
                       setPageMessage("");
                     }}
-                    className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className={solidSecondaryButton}
                   >
                     Edit organization
                   </button>
@@ -1306,16 +1318,13 @@ function OrganizationPage() {
                   <button
                     onClick={handleLeaveOrganization}
                     disabled={leavingOrganization}
-                    className="rounded-2xl border border-red-200 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    className={solidDangerButton}
                   >
                     {leavingOrganization ? "Leaving..." : "Leave organization"}
                   </button>
                 )}
 
-                <Link
-                  to="/organizations"
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
+                <Link to="/organizations" className={solidSecondaryButton}>
                   All organizations
                 </Link>
               </div>
@@ -1365,7 +1374,8 @@ function OrganizationPage() {
                   Organization settings
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Update the main details and upload logo and cover directly from your computer.
+                  Update the main details and upload logo and cover directly from your
+                  computer.
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -1444,24 +1454,26 @@ function OrganizationPage() {
                 <div className="rounded-2xl border border-slate-200 p-4">
                   <p className="text-sm font-medium text-slate-700">Logo</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Recommended: square image. Max 2 MB.
+                    Recommended: rectangular or square logo. Max 2 MB.
                   </p>
 
                   <div className="mt-4 flex items-center gap-4">
-                    {logoPreviewUrl ? (
-                      <img
-                        src={logoPreviewUrl}
-                        alt="Logo preview"
-                        className="h-20 w-20 rounded-3xl border border-slate-200 object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-900 text-lg font-semibold text-white">
-                        {getInitials(orgName || organization.name)}
-                      </div>
-                    )}
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl border border-slate-200 bg-white">
+                      {logoPreviewUrl ? (
+                        <img
+                          src={logoPreviewUrl}
+                          alt="Logo preview"
+                          className="h-full w-full rounded-[1.1rem] object-contain p-2"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
+                          {getInitials(orgName || organization.name)}
+                        </div>
+                      )}
+                    </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <label className="cursor-pointer rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                      <label className={smallPrimaryButton + " cursor-pointer"}>
                         Choose logo
                         <input
                           type="file"
@@ -1471,11 +1483,7 @@ function OrganizationPage() {
                         />
                       </label>
 
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                      >
+                      <button type="button" onClick={handleRemoveLogo} className={smallSecondaryButton}>
                         Remove
                       </button>
                     </div>
@@ -1493,7 +1501,7 @@ function OrganizationPage() {
                   </p>
 
                   <div
-                    className="mt-4 h-24 rounded-2xl bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+                    className="mt-4 h-28 rounded-2xl bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
                     style={
                       coverPreviewUrl
                         ? {
@@ -1506,7 +1514,7 @@ function OrganizationPage() {
                   />
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <label className="cursor-pointer rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                    <label className={smallPrimaryButton + " cursor-pointer"}>
                       Choose cover
                       <input
                         type="file"
@@ -1516,11 +1524,7 @@ function OrganizationPage() {
                       />
                     </label>
 
-                    <button
-                      type="button"
-                      onClick={handleRemoveCover}
-                      className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                    <button type="button" onClick={handleRemoveCover} className={smallSecondaryButton}>
                       Remove
                     </button>
                   </div>
@@ -1531,16 +1535,13 @@ function OrganizationPage() {
                 </div>
 
                 <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
-                  <button
-                    onClick={handleCancelOrganizationEdit}
-                    className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
+                  <button onClick={handleCancelOrganizationEdit} className={solidSecondaryButton}>
                     Cancel
                   </button>
                   <button
                     onClick={handleSaveOrganization}
                     disabled={savingOrganization || !orgName.trim()}
-                    className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                    className={solidPrimaryButton}
                   >
                     {savingOrganization ? "Saving..." : "Save organization"}
                   </button>
@@ -1589,8 +1590,8 @@ function OrganizationPage() {
                   Ownership transfer
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Transfer this organization to an existing member or admin. After transfer,
-                  you become an admin and can leave the organization if needed.
+                  Transfer this organization to an existing member or admin. After
+                  transfer, you become an admin and can leave the organization if needed.
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -1600,7 +1601,8 @@ function OrganizationPage() {
 
             {ownershipTransferCandidates.length === 0 ? (
               <div className="mt-5 rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                You need at least one other member or admin before you can transfer ownership.
+                You need at least one other member or admin before you can transfer
+                ownership.
               </div>
             ) : (
               <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
@@ -1625,7 +1627,7 @@ function OrganizationPage() {
                 <button
                   onClick={handleTransferOwnership}
                   disabled={transferringOwnership || !transferTargetUserId}
-                  className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  className={solidPrimaryButton}
                 >
                   {transferringOwnership ? "Transferring..." : "Transfer ownership"}
                 </button>
@@ -1679,14 +1681,14 @@ function OrganizationPage() {
                         <button
                           onClick={() => handleApproveRequest(request)}
                           disabled={processingRequestId === request.id}
-                          className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                          className={smallPrimaryButton}
                         >
                           {processingRequestId === request.id ? "Working..." : "Approve"}
                         </button>
                         <button
                           onClick={() => handleDeclineRequest(request.id)}
                           disabled={processingRequestId === request.id}
-                          className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                          className={smallSecondaryButton}
                         >
                           Decline
                         </button>
@@ -1762,9 +1764,11 @@ function OrganizationPage() {
                           <button
                             onClick={() => handleChangeMemberRole(member.id, "admin")}
                             disabled={processingMemberId === member.id}
-                            className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                            className={smallPrimaryButton}
                           >
-                            {processingMemberId === member.id ? "Working..." : "Promote to admin"}
+                            {processingMemberId === member.id
+                              ? "Working..."
+                              : "Promote to admin"}
                           </button>
                         )}
 
@@ -1772,9 +1776,11 @@ function OrganizationPage() {
                           <button
                             onClick={() => handleChangeMemberRole(member.id, "member")}
                             disabled={processingMemberId === member.id}
-                            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                            className={smallSecondaryButton}
                           >
-                            {processingMemberId === member.id ? "Working..." : "Demote to member"}
+                            {processingMemberId === member.id
+                              ? "Working..."
+                              : "Demote to member"}
                           </button>
                         )}
 
@@ -1782,9 +1788,11 @@ function OrganizationPage() {
                           <button
                             onClick={() => handleRemoveMember(member.id)}
                             disabled={processingMemberId === member.id}
-                            className="rounded-2xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                            className={smallDangerButton}
                           >
-                            {processingMemberId === member.id ? "Working..." : "Remove member"}
+                            {processingMemberId === member.id
+                              ? "Working..."
+                              : "Remove member"}
                           </button>
                         )}
                       </div>
@@ -1814,17 +1822,19 @@ function OrganizationPage() {
           {canManageOrganization ? (
             <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="mb-4 flex items-center gap-3">
-                {organization.logo_url ? (
-                  <img
-                    src={organization.logo_url}
-                    alt={organization.name}
-                    className="h-12 w-12 rounded-full border border-slate-200 object-cover"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
-                    {getInitials(organization.name)}
-                  </div>
-                )}
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white">
+                  {organization.logo_url ? (
+                    <img
+                      src={organization.logo_url}
+                      alt={organization.name}
+                      className="h-full w-full rounded-full object-contain p-1.5"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                      {getInitials(organization.name)}
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700">
                     Post as {organization.name}
@@ -1845,7 +1855,7 @@ function OrganizationPage() {
                 <button
                   onClick={handleCreateOrganizationPost}
                   disabled={creatingPost || !newPost.trim()}
-                  className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  className={solidPrimaryButton}
                 >
                   {creatingPost ? "Posting..." : "Publish organization post"}
                 </button>
@@ -1883,23 +1893,30 @@ function OrganizationPage() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
-                        {organizationInfo?.logo_url ? (
-                          <img
-                            src={organizationInfo.logo_url}
-                            alt={organizationInfo.name}
-                            className="h-12 w-12 rounded-full border border-slate-200 object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
-                            {getInitials(organizationInfo?.name || organization.name)}
-                          </div>
-                        )}
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white">
+                          {organizationInfo?.logo_url ? (
+                            <img
+                              src={organizationInfo.logo_url}
+                              alt={organizationInfo.name}
+                              className="h-full w-full rounded-full object-contain p-1.5"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                              {getInitials(organizationInfo?.name || organization.name)}
+                            </div>
+                          )}
+                        </div>
                         <div>
                           <h3 className="text-lg font-semibold text-slate-900">
                             {organizationInfo?.name || organization.name}
                           </h3>
                           <p className="mt-1 text-sm text-slate-500">
-                            {organizationInfo?.organization_type || organization.organization_type} · posted by {author?.full_name || "member"} · {post.created_at ? new Date(post.created_at).toLocaleString() : "Just now"}
+                            {organizationInfo?.organization_type ||
+                              organization.organization_type}{" "}
+                            · posted by {author?.full_name || "member"} ·{" "}
+                            {post.created_at
+                              ? new Date(post.created_at).toLocaleString()
+                              : "Just now"}
                           </p>
                         </div>
                       </div>
@@ -1912,7 +1929,7 @@ function OrganizationPage() {
                           <button
                             onClick={() => handleDeletePost(post.id)}
                             disabled={deletingPostId === post.id}
-                            className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
                           >
                             {deletingPostId === post.id ? "Deleting..." : "Delete"}
                           </button>
@@ -1972,7 +1989,7 @@ function OrganizationPage() {
                                 <button
                                   onClick={() => handleDeleteComment(comment.id)}
                                   disabled={deletingCommentId === comment.id}
-                                  className="rounded-full border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                  className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
                                 >
                                   {deletingCommentId === comment.id
                                     ? "Deleting..."
@@ -2003,7 +2020,7 @@ function OrganizationPage() {
                             commentingPostId === post.id ||
                             !(commentDrafts[post.id] || "").trim()
                           }
-                          className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                          className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
                         >
                           {commentingPostId === post.id ? "..." : "Comment"}
                         </button>
@@ -2043,15 +2060,15 @@ function OrganizationPage() {
           <div className="mt-4 space-y-4">
             <div>
               <p className="text-sm text-slate-500">Logo</p>
-              <div className="mt-2">
+              <div className="mt-2 flex h-24 w-24 items-center justify-center rounded-3xl border border-slate-200 bg-white">
                 {organization.logo_url ? (
                   <img
                     src={organization.logo_url}
                     alt={organization.name}
-                    className="h-20 w-20 rounded-3xl border border-slate-200 object-cover"
+                    className="h-full w-full rounded-[1.1rem] object-contain p-2"
                   />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-900 text-lg font-semibold text-white">
+                  <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
                     {getInitials(organization.name)}
                   </div>
                 )}
