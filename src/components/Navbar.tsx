@@ -8,17 +8,12 @@ function Navbar() {
           Asobu
         </Link>
 
-        <div className="hidden flex-1 md:block">
-          <input
-            type="text"
-            placeholder="Search players, coaches, teams, communities..."
-            className="w-full rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
-          />
-        </div>
-
         <nav className="flex items-center gap-5 text-sm font-medium text-slate-600">
           <Link to="/" className="hover:text-slate-900">
             Feed
+          </Link>
+          <Link to="/organizations" className="hover:text-slate-900">
+            Organizations
           </Link>
           <Link to="/profile" className="hover:text-slate-900">
             Profile
