@@ -1,16 +1,58 @@
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
 import ProfileCard from "../components/ProfileCard";
 import FeedCard from "../components/FeedCard";
 import SuggestionsCard from "../components/SuggestionsCard";
 
+type DbProfile = {
+  id: string;
+  full_name: string | null;
+  role: string | null;
+  location: string | null;
+  main_sport: string | null;
+};
+
 function FeedPage() {
-  const profile = {
-    name: "Nicolas Bachmann",
-    role: "Player / Founder",
-    location: "Lugano, Switzerland",
-    sports: ["Football", "Padel", "Tennis"],
-    organization: "Asobu Community",
+  const [profile, setProfile] = useState({
+    name: "Loading...",
+    role: "Loading...",
+    location: "Loading...",
+    sports: [] as string[],
+    organization: "No organization yet",
     openTo: ["Teams", "Clubs", "Communities"],
-  };
+  });
+
+  useEffect(() => {
+    async function loadProfile() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single<DbProfile>();
+
+      if (error) {
+        console.error("Error loading feed profile:", error.message);
+        return;
+      }
+
+      setProfile({
+        name: data.full_name || "No name yet",
+        role: data.role || "No role yet",
+        location: data.location || "No location yet",
+        sports: data.main_sport ? [data.main_sport] : [],
+        organization: "No organization yet",
+        openTo: ["Teams", "Clubs", "Communities"],
+      });
+    }
+
+    loadProfile();
+  }, []);
 
   const posts = [
     {
