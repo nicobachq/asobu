@@ -29,6 +29,8 @@ type Organization = {
   description: string | null;
   created_by: string;
   created_at: string | null;
+  logo_url: string | null;
+  cover_image_url: string | null;
 };
 
 type MembershipLookupRow = {
@@ -54,6 +56,7 @@ type RelatedOrganization = {
   id: number;
   name: string;
   organization_type: string | null;
+  logo_url: string | null;
 };
 
 type RawPost = {
@@ -145,9 +148,40 @@ type TransferOwnershipRpcResponse = {
   success: boolean;
 };
 
+const ORGANIZATION_MEDIA_BUCKET = "organization-media";
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024;
+
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function getInitials(name: string) {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() || "")
+      .join("") || "O"
+  );
+}
+
+function sanitizeFileName(fileName: string) {
+  const cleaned = fileName
+    .toLowerCase()
+    .replace(/[^a-z0-9.\-_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return cleaned || "image";
+}
+
+function safeRevokeObjectUrl(url: string) {
+  if (url.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function OrganizationPage() {
@@ -180,6 +214,12 @@ function OrganizationPage() {
   const [orgSport, setOrgSport] = useState("");
   const [orgLocation, setOrgLocation] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
+  const [orgLogoUrl, setOrgLogoUrl] = useState("");
+  const [orgCoverImageUrl, setOrgCoverImageUrl] = useState("");
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [savingOrganization, setSavingOrganization] = useState(false);
   const [leavingOrganization, setLeavingOrganization] = useState(false);
   const [transferTargetUserId, setTransferTargetUserId] = useState("");
@@ -227,6 +267,13 @@ function OrganizationPage() {
       return stillExists ? current : ownershipTransferCandidates[0].user_id;
     });
   }, [ownershipTransferCandidates]);
+
+  useEffect(() => {
+    return () => {
+      safeRevokeObjectUrl(logoPreviewUrl);
+      safeRevokeObjectUrl(coverPreviewUrl);
+    };
+  }, [logoPreviewUrl, coverPreviewUrl]);
 
   useEffect(() => {
     let isMounted = true;
@@ -373,6 +420,12 @@ function OrganizationPage() {
     setOrgSport(typedOrganization.sport || "");
     setOrgLocation(typedOrganization.location || "");
     setOrgDescription(typedOrganization.description || "");
+    setOrgLogoUrl(typedOrganization.logo_url || "");
+    setOrgCoverImageUrl(typedOrganization.cover_image_url || "");
+    setLogoPreviewUrl(typedOrganization.logo_url || "");
+    setCoverPreviewUrl(typedOrganization.cover_image_url || "");
+    setLogoFile(null);
+    setCoverFile(null);
 
     const { data: membershipData, error: membershipError } = await supabase
       .from("organization_members")
@@ -492,7 +545,7 @@ function OrganizationPage() {
     const { data, error } = await supabase
       .from("posts")
       .select(
-        "id, user_id, organization_id, content, created_at, profiles(full_name, role), organizations(id, name, organization_type)"
+        "id, user_id, organization_id, content, created_at, profiles(full_name, role), organizations(id, name, organization_type, logo_url)"
       )
       .eq("organization_id", orgId)
       .order("created_at", { ascending: false });
@@ -551,6 +604,120 @@ function OrganizationPage() {
     await loadOrganizationData(organizationId, authUserId);
   }
 
+  function handleCancelOrganizationEdit() {
+    if (!organization) return;
+
+    safeRevokeObjectUrl(logoPreviewUrl);
+    safeRevokeObjectUrl(coverPreviewUrl);
+
+    setOrgName(organization.name || "");
+    setOrgType(organization.organization_type || "community");
+    setOrgSport(organization.sport || "");
+    setOrgLocation(organization.location || "");
+    setOrgDescription(organization.description || "");
+    setOrgLogoUrl(organization.logo_url || "");
+    setOrgCoverImageUrl(organization.cover_image_url || "");
+    setLogoPreviewUrl(organization.logo_url || "");
+    setCoverPreviewUrl(organization.cover_image_url || "");
+    setLogoFile(null);
+    setCoverFile(null);
+    setEditMode(false);
+    setPageError("");
+    setPageMessage("");
+  }
+
+  function handleLogoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setPageError("Logo must be an image file.");
+      return;
+    }
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      setPageError("Logo is too large. Maximum size is 2 MB.");
+      return;
+    }
+
+    setPageError("");
+    safeRevokeObjectUrl(logoPreviewUrl);
+
+    const nextPreviewUrl = URL.createObjectURL(file);
+    setLogoFile(file);
+    setLogoPreviewUrl(nextPreviewUrl);
+  }
+
+  function handleCoverFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setPageError("Cover must be an image file.");
+      return;
+    }
+
+    if (file.size > MAX_COVER_SIZE_BYTES) {
+      setPageError("Cover is too large. Maximum size is 5 MB.");
+      return;
+    }
+
+    setPageError("");
+    safeRevokeObjectUrl(coverPreviewUrl);
+
+    const nextPreviewUrl = URL.createObjectURL(file);
+    setCoverFile(file);
+    setCoverPreviewUrl(nextPreviewUrl);
+  }
+
+  function handleRemoveLogo() {
+    safeRevokeObjectUrl(logoPreviewUrl);
+    setLogoFile(null);
+    setOrgLogoUrl("");
+    setLogoPreviewUrl("");
+  }
+
+  function handleRemoveCover() {
+    safeRevokeObjectUrl(coverPreviewUrl);
+    setCoverFile(null);
+    setOrgCoverImageUrl("");
+    setCoverPreviewUrl("");
+  }
+
+  async function uploadOrganizationMedia(
+    file: File,
+    kind: "logo" | "cover"
+  ): Promise<string> {
+    if (!organizationId) {
+      throw new Error("Organization id is missing.");
+    }
+
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const safeName = sanitizeFileName(file.name.replace(/\.[^.]+$/, ""));
+    const filePath = `org-${organizationId}/${kind}-${Date.now()}-${safeName}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(ORGANIZATION_MEDIA_BUCKET)
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(ORGANIZATION_MEDIA_BUCKET)
+      .getPublicUrl(filePath);
+
+    return publicUrlData.publicUrl;
+  }
+
   async function handleSaveOrganization() {
     if (!organizationId || !organization || !canEditOrganization || !orgName.trim()) {
       return;
@@ -560,41 +727,52 @@ function OrganizationPage() {
     setPageError("");
     setPageMessage("");
 
-    const { error } = await supabase
-      .from("organizations")
-      .update({
-        name: orgName.trim(),
-        organization_type: orgType,
-        sport: orgSport.trim() || null,
-        location: orgLocation.trim() || null,
-        description: orgDescription.trim() || null,
-      })
-      .eq("id", organizationId);
+    try {
+      let nextLogoUrl: string | null = orgLogoUrl.trim() || null;
+      let nextCoverUrl: string | null = orgCoverImageUrl.trim() || null;
 
-    if (error) {
-      console.error("Error updating organization:", error.message);
-      setPageError(`Error: ${error.message}`);
+      if (logoFile) {
+        nextLogoUrl = await uploadOrganizationMedia(logoFile, "logo");
+      }
+
+      if (coverFile) {
+        nextCoverUrl = await uploadOrganizationMedia(coverFile, "cover");
+      }
+
+      const { error } = await supabase
+        .from("organizations")
+        .update({
+          name: orgName.trim(),
+          organization_type: orgType,
+          sport: orgSport.trim() || null,
+          location: orgLocation.trim() || null,
+          description: orgDescription.trim() || null,
+          logo_url: nextLogoUrl,
+          cover_image_url: nextCoverUrl,
+        })
+        .eq("id", organizationId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setOrgLogoUrl(nextLogoUrl || "");
+      setOrgCoverImageUrl(nextCoverUrl || "");
+      setLogoPreviewUrl(nextLogoUrl || "");
+      setCoverPreviewUrl(nextCoverUrl || "");
+      setLogoFile(null);
+      setCoverFile(null);
+      setEditMode(false);
+      setPageMessage("Organization updated successfully.");
+      await refreshOrganizationSection();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown upload error.";
+      console.error("Error updating organization:", message);
+      setPageError(`Error: ${message}`);
+    } finally {
       setSavingOrganization(false);
-      return;
     }
-
-    setPageMessage("Organization updated successfully.");
-    setEditMode(false);
-    await refreshOrganizationSection();
-    setSavingOrganization(false);
-  }
-
-  function handleCancelOrganizationEdit() {
-    if (!organization) return;
-
-    setOrgName(organization.name || "");
-    setOrgType(organization.organization_type || "community");
-    setOrgSport(organization.sport || "");
-    setOrgLocation(organization.location || "");
-    setOrgDescription(organization.description || "");
-    setEditMode(false);
-    setPageError("");
-    setPageMessage("");
   }
 
   async function handleJoinRequest() {
@@ -1048,23 +1226,48 @@ function OrganizationPage() {
 
       <div className="space-y-5">
         <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
-          <div className="h-36 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500" />
+          <div
+            className="h-44 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+            style={
+              organization.cover_image_url
+                ? {
+                    backgroundImage: `url(${organization.cover_image_url})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : undefined
+            }
+          />
 
           <div className="p-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">
-                  Organization
-                </p>
-                <h1 className="mt-2 text-3xl font-bold text-slate-900">
-                  {organization.name}
-                </h1>
-                <p className="mt-2 text-sm font-medium text-slate-600">
-                  {organization.organization_type}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {organization.location || "No location yet"}
-                </p>
+            <div className="-mt-20 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-start gap-4">
+                {organization.logo_url ? (
+                  <img
+                    src={organization.logo_url}
+                    alt={organization.name}
+                    className="h-24 w-24 rounded-3xl border-4 border-white bg-white object-cover shadow-md"
+                  />
+                ) : (
+                  <div className="flex h-24 w-24 items-center justify-center rounded-3xl border-4 border-white bg-slate-900 text-xl font-semibold text-white shadow-md">
+                    {getInitials(organization.name)}
+                  </div>
+                )}
+
+                <div className="pt-20 lg:pt-0">
+                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">
+                    Organization
+                  </p>
+                  <h1 className="mt-2 text-3xl font-bold text-slate-900">
+                    {organization.name}
+                  </h1>
+                  <p className="mt-2 text-sm font-medium text-slate-600">
+                    {organization.organization_type}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {organization.location || "No location yet"}
+                  </p>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1162,7 +1365,7 @@ function OrganizationPage() {
                   Organization settings
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Update the main details people see on this page.
+                  Update the main details and upload logo and cover directly from your computer.
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -1236,6 +1439,95 @@ function OrganizationPage() {
                     rows={5}
                     className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
                   />
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <p className="text-sm font-medium text-slate-700">Logo</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Recommended: square image. Max 2 MB.
+                  </p>
+
+                  <div className="mt-4 flex items-center gap-4">
+                    {logoPreviewUrl ? (
+                      <img
+                        src={logoPreviewUrl}
+                        alt="Logo preview"
+                        className="h-20 w-20 rounded-3xl border border-slate-200 object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-900 text-lg font-semibold text-white">
+                        {getInitials(orgName || organization.name)}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      <label className="cursor-pointer rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                        Choose logo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleLogoFileChange}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+
+                  {logoFile && (
+                    <p className="mt-3 text-xs text-slate-500">{logoFile.name}</p>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <p className="text-sm font-medium text-slate-700">Cover</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Recommended: wide image. Max 5 MB.
+                  </p>
+
+                  <div
+                    className="mt-4 h-24 rounded-2xl bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+                    style={
+                      coverPreviewUrl
+                        ? {
+                            backgroundImage: `url(${coverPreviewUrl})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }
+                        : undefined
+                    }
+                  />
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <label className="cursor-pointer rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                      Choose cover
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleCoverFileChange}
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  {coverFile && (
+                    <p className="mt-3 text-xs text-slate-500">{coverFile.name}</p>
+                  )}
                 </div>
 
                 <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
@@ -1521,9 +1813,28 @@ function OrganizationPage() {
 
           {canManageOrganization ? (
             <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Post as {organization.name}
-              </label>
+              <div className="mb-4 flex items-center gap-3">
+                {organization.logo_url ? (
+                  <img
+                    src={organization.logo_url}
+                    alt={organization.name}
+                    className="h-12 w-12 rounded-full border border-slate-200 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                    {getInitials(organization.name)}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Post as {organization.name}
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    {organization.organization_type}
+                  </p>
+                </div>
+              </div>
+
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
@@ -1571,13 +1882,26 @@ function OrganizationPage() {
                     className="rounded-2xl border border-slate-200 p-5"
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          {organizationInfo?.name || organization.name}
-                        </h3>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {organizationInfo?.organization_type || organization.organization_type} · posted by {author?.full_name || "member"} · {post.created_at ? new Date(post.created_at).toLocaleString() : "Just now"}
-                        </p>
+                      <div className="flex items-start gap-3">
+                        {organizationInfo?.logo_url ? (
+                          <img
+                            src={organizationInfo.logo_url}
+                            alt={organizationInfo.name}
+                            className="h-12 w-12 rounded-full border border-slate-200 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                            {getInitials(organizationInfo?.name || organization.name)}
+                          </div>
+                        )}
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            {organizationInfo?.name || organization.name}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {organizationInfo?.organization_type || organization.organization_type} · posted by {author?.full_name || "member"} · {post.created_at ? new Date(post.created_at).toLocaleString() : "Just now"}
+                          </p>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -1715,6 +2039,44 @@ function OrganizationPage() {
         </section>
 
         <section className="rounded-3xl bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Branding</h2>
+          <div className="mt-4 space-y-4">
+            <div>
+              <p className="text-sm text-slate-500">Logo</p>
+              <div className="mt-2">
+                {organization.logo_url ? (
+                  <img
+                    src={organization.logo_url}
+                    alt={organization.name}
+                    className="h-20 w-20 rounded-3xl border border-slate-200 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-900 text-lg font-semibold text-white">
+                    {getInitials(organization.name)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm text-slate-500">Cover</p>
+              <div
+                className="mt-2 h-24 rounded-2xl bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+                style={
+                  organization.cover_image_url
+                    ? {
+                        backgroundImage: `url(${organization.cover_image_url})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                      }
+                    : undefined
+                }
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">Management</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 text-center">
             <div className="rounded-2xl bg-slate-50 px-3 py-4">
@@ -1729,9 +2091,9 @@ function OrganizationPage() {
 
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
             {canManageMembers
-              ? "You can edit organization details, transfer ownership, review join requests, promote or remove members, and publish organization posts on this page."
+              ? "You can edit organization details, upload branding, transfer ownership, review join requests, promote or remove members, and publish organization posts on this page."
               : canManageOrganization
-              ? "You can edit organization details, review join requests, publish organization posts, and leave the organization yourself. Member role changes and ownership transfer stay limited to the owner."
+              ? "You can edit organization details, upload branding, review join requests, publish organization posts, and leave the organization yourself. Member role changes and ownership transfer stay limited to the owner."
               : canSelfLeave
               ? "You are a member of this organization and can leave it at any time from the top action buttons."
               : myMembershipRole === "owner"
