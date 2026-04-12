@@ -6,6 +6,7 @@ import FeedPage from "./pages/FeedPage";
 import ProfilePage from "./pages/ProfilePage";
 import MessagesPage from "./pages/MessagesPage";
 import AuthPage from "./pages/AuthPage";
+import OrganizationPage from "./pages/OrganizationPage";
 import { supabase } from "./lib/supabase";
 
 function App() {
@@ -98,6 +99,7 @@ function App() {
         <Route path="/" element={<FeedPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/messages" element={<MessagesPage />} />
+        <Route path="/organizations/:id" element={<OrganizationPage />} />
       </Routes>
     </div>
   );

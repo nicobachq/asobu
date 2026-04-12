@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 type Profile = {
@@ -21,10 +22,23 @@ type Organization = {
   created_at: string | null;
 };
 
+type OrganizationMembershipRow = {
+  id: number;
+  organization_id: number;
+  user_id: string;
+  member_role: string | null;
+  created_at: string | null;
+  organizations: Organization | Organization[] | null;
+};
+
+type OrganizationWithRole = Organization & {
+  member_role: string;
+};
+
 function ProfilePage() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizations, setOrganizations] = useState<OrganizationWithRole[]>([]);
 
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("");
@@ -65,7 +79,7 @@ function ProfilePage() {
       if (error) {
         console.error("Error loading profile:", error.message);
       } else {
-        setProfile(data);
+        setProfile(data as Profile);
         setFullName(data.full_name || "");
         setRole(data.role || "");
         setLocation(data.location || "");
@@ -83,21 +97,34 @@ function ProfilePage() {
     const { data, error } = await supabase
       .from("organization_members")
       .select(
-        "organization_id, organizations(id, name, organization_type, sport, location, description, created_by, created_at)"
+        "id, organization_id, user_id, member_role, created_at, organizations(id, name, organization_type, sport, location, description, created_by, created_at)"
       )
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
 
     if (error) {
       console.error("Error loading organizations:", error.message);
       return;
     }
 
-    const mapped =
-      data
-        ?.map((item: any) => item.organizations)
-        .filter(Boolean) || [];
+    const mapped: OrganizationWithRole[] = ((data as OrganizationMembershipRow[]) || [])
+      .map((item) => {
+        const organization = Array.isArray(item.organizations)
+          ? item.organizations[0]
+          : item.organizations;
 
-    setOrganizations(mapped as Organization[]);
+        if (!organization) {
+          return null;
+        }
+
+        return {
+          ...organization,
+          member_role: item.member_role || "member",
+        };
+      })
+      .filter(Boolean) as OrganizationWithRole[];
+
+    setOrganizations(mapped);
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -168,7 +195,7 @@ function ProfilePage() {
     const { error: memberError } = await supabase.from("organization_members").insert({
       organization_id: orgData.id,
       user_id: profileId,
-      member_role: "admin",
+      member_role: "owner",
     });
 
     if (memberError) {
@@ -423,19 +450,29 @@ function ProfilePage() {
           ) : (
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               {organizations.map((org) => (
-                <div
+                <Link
                   key={org.id}
-                  className="rounded-2xl border border-slate-200 p-4"
+                  to={`/organizations/${org.id}`}
+                  className="rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
                 >
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    {org.name}
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {org.organization_type}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {org.location || "No location"}
-                  </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        {org.name}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {org.organization_type}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {org.location || "No location"}
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                      {org.member_role}
+                    </span>
+                  </div>
+
                   <p className="mt-3 text-sm text-slate-700">
                     {org.description || "No description"}
                   </p>
@@ -446,7 +483,7 @@ function ProfilePage() {
                       </span>
                     )}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
