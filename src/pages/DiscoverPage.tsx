@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { DISCOVER_SPORT_OPTIONS, getNormalizedSportsFromValue, getSportLabelsFromValue } from "../lib/sports";
+import {
+  formatPersonRoleLabel,
+  getUniquePersonRoles,
+  normalizePersonRole,
+  type PersonRole,
+} from "../lib/identity";
+import {
+  DISCOVER_SPORT_OPTIONS,
+  getNormalizedSportsFromValue,
+  getSportLabelsFromValue,
+} from "../lib/sports";
 import ProfileCard from "../components/ProfileCard";
 
 type DbProfile = {
@@ -27,15 +37,6 @@ type MembershipLookupRow = {
 
 type OrganizationNameRow = {
   name: string;
-};
-
-type DiscoverProfile = {
-  id: string;
-  full_name: string | null;
-  role: string | null;
-  location: string | null;
-  main_sport: string | null;
-  organization_name: string | null;
 };
 
 type RelatedOrganization = {
@@ -69,6 +70,24 @@ type MemberCountRow = {
   organization_id: number;
 };
 
+type ProfileRoleRow = {
+  user_id: string;
+  role: string;
+  sport: string | null;
+  is_primary: boolean;
+};
+
+type DiscoverProfile = {
+  id: string;
+  full_name: string | null;
+  role: string | null;
+  location: string | null;
+  main_sport: string | null;
+  organization_name: string | null;
+  roles: PersonRole[];
+  primary_role: PersonRole | null;
+};
+
 type DiscoverTab = "players" | "coaches" | "organizations";
 
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -87,17 +106,9 @@ function getInitials(name: string) {
   );
 }
 
-function roleMatchesTab(roleValue: string | null, tab: DiscoverTab) {
-  const normalized = (roleValue || "").trim().toLowerCase();
-
-  if (tab === "players") {
-    return normalized === "player" || normalized === "athlete";
-  }
-
-  if (tab === "coaches") {
-    return normalized === "coach";
-  }
-
+function roleMatchesTab(roles: PersonRole[], tab: DiscoverTab) {
+  if (tab === "players") return roles.includes("player");
+  if (tab === "coaches") return roles.includes("coach");
   return false;
 }
 
@@ -209,7 +220,9 @@ function DiscoverPage() {
     if (profileIds.length > 0) {
       const { data: membershipData, error: membershipError } = await supabase
         .from("organization_members")
-        .select("user_id, organizations(id, name, organization_type, sport, location, description, logo_url, cover_image_url)")
+        .select(
+          "user_id, organizations(id, name, organization_type, sport, location, description, logo_url, cover_image_url)"
+        )
         .in("user_id", profileIds);
 
       if (membershipError) {
@@ -230,10 +243,48 @@ function DiscoverPage() {
       }
     }
 
-    const normalizedProfiles: DiscoverProfile[] = typedProfiles.map((item) => ({
-      ...item,
-      organization_name: organizationNameByUserId[item.id] || null,
-    }));
+    let rolesByUserId: Record<string, PersonRole[]> = {};
+    let primaryRoleByUserId: Record<string, PersonRole | null> = {};
+
+    const { data: profileRoleData, error: profileRoleError } = await supabase
+      .from("profile_roles")
+      .select("user_id, role, sport, is_primary")
+      .in("user_id", profileIds);
+
+    if (profileRoleError) {
+      console.warn("profile_roles unavailable, Discover is falling back to profile.role");
+    } else {
+      const typedRoleRows = (profileRoleData as ProfileRoleRow[]) || [];
+      rolesByUserId = typedRoleRows.reduce((acc, row) => {
+        const normalized = normalizePersonRole(row.role);
+        if (!normalized) return acc;
+        acc[row.user_id] = Array.from(new Set([...(acc[row.user_id] || []), normalized]));
+        return acc;
+      }, {} as Record<string, PersonRole[]>);
+
+      primaryRoleByUserId = typedRoleRows.reduce((acc, row) => {
+        if (row.is_primary) {
+          acc[row.user_id] = normalizePersonRole(row.role);
+        }
+        return acc;
+      }, {} as Record<string, PersonRole | null>);
+    }
+
+    const normalizedProfiles: DiscoverProfile[] = typedProfiles.map((item) => {
+      const fallbackRoles = getUniquePersonRoles([item.role]);
+      const resolvedRoles = rolesByUserId[item.id]?.length
+        ? rolesByUserId[item.id]
+        : fallbackRoles;
+      const resolvedPrimaryRole =
+        primaryRoleByUserId[item.id] || resolvedRoles[0] || normalizePersonRole(item.role);
+
+      return {
+        ...item,
+        organization_name: organizationNameByUserId[item.id] || null,
+        roles: resolvedRoles,
+        primary_role: resolvedPrimaryRole,
+      };
+    });
 
     setProfiles(normalizedProfiles);
   }
@@ -275,7 +326,7 @@ function DiscoverPage() {
 
   const filteredProfiles = useMemo(() => {
     return profiles.filter((item) => {
-      if (!roleMatchesTab(item.role, activeTab)) {
+      if (!roleMatchesTab(item.roles, activeTab)) {
         return false;
       }
 
@@ -285,11 +336,11 @@ function DiscoverPage() {
         (item.full_name || "").toLowerCase().includes(normalizedSearch) ||
         (item.location || "").toLowerCase().includes(normalizedSearch) ||
         (item.main_sport || "").toLowerCase().includes(normalizedSearch) ||
-        (item.organization_name || "").toLowerCase().includes(normalizedSearch);
+        (item.organization_name || "").toLowerCase().includes(normalizedSearch) ||
+        item.roles.some((role) => formatPersonRoleLabel(role).toLowerCase().includes(normalizedSearch));
 
       const normalizedSports = getNormalizedSportsFromValue(item.main_sport);
-      const matchesSport =
-        sportFilter === "all" || normalizedSports.includes(sportFilter);
+      const matchesSport = sportFilter === "all" || normalizedSports.includes(sportFilter);
 
       return matchesSearch && matchesSport;
     });
@@ -310,8 +361,7 @@ function DiscoverPage() {
         (item.organization_type || "").toLowerCase().includes(normalizedSearch);
 
       const normalizedSports = getNormalizedSportsFromValue(item.sport);
-      const matchesSport =
-        sportFilter === "all" || normalizedSports.includes(sportFilter);
+      const matchesSport = sportFilter === "all" || normalizedSports.includes(sportFilter);
 
       return matchesSearch && matchesSport;
     });
@@ -335,7 +385,9 @@ function DiscoverPage() {
                 Explore the sports network
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                Search for players, coaches, and organizations across Asobu. This is the first step toward a real discovery layer for talent, teams, and opportunities.
+                Search for players, coaches, and organizations across Asobu. This
+                first discovery layer already understands people with more than one
+                role.
               </p>
             </div>
 
@@ -368,7 +420,7 @@ function DiscoverPage() {
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
-                Search by name, sport, location, or organization
+                Search by name, sport, location, role, or organization
               </label>
               <input
                 type="text"
@@ -450,27 +502,22 @@ function DiscoverPage() {
                         <h2 className="truncate text-xl font-semibold text-slate-900">
                           {organization.name}
                         </h2>
-                        <p className="mt-1 text-sm font-medium text-slate-600">
-                          {organization.organization_type || "Organization"}
+                        <p className="mt-1 text-sm font-medium text-slate-600 capitalize">
+                          {organization.organization_type || "organization"}
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {getSportLabelsFromValue(organization.sport).length > 0 ? (
-                        getSportLabelsFromValue(organization.sport).map((sportLabel) => (
-                          <span
-                            key={`${organization.id}-${sportLabel}`}
-                            className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
-                          >
-                            {sportLabel}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                          Sport not set
+                      {getSportLabelsFromValue(organization.sport).map((sport) => (
+                        <span
+                          key={sport}
+                          className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
+                        >
+                          {sport}
                         </span>
-                      )}
+                      ))}
+
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                         {memberCountsByOrg[organization.id] || 0} members
                       </span>
@@ -480,7 +527,7 @@ function DiscoverPage() {
                       {organization.description || "No description yet."}
                     </p>
 
-                    <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-500">
                       <span>{organization.location || "No location"}</span>
                       <span className="font-medium text-slate-700">Open page</span>
                     </div>
@@ -493,72 +540,53 @@ function DiscoverPage() {
               {filteredProfiles.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-[28px] border border-slate-200 bg-white p-5"
+                  className="rounded-[28px] border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50"
                 >
                   <div className="flex items-start gap-4">
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white">
-                      {getInitials(item.full_name || "Athlete")}
+                      {getInitials(item.full_name || "Asobu User")}
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h2 className="truncate text-xl font-semibold text-slate-900">
-                            {item.full_name || "Unnamed profile"}
-                          </h2>
-                          <p className="mt-1 text-sm font-medium text-slate-600 capitalize">
-                            {item.role || "No role yet"}
-                          </p>
-                        </div>
-
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                          {activeTab === "players" ? "Player" : "Coach"}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {getSportLabelsFromValue(item.main_sport).length > 0 ? (
-                          getSportLabelsFromValue(item.main_sport).map((sportLabel) => (
-                            <span
-                              key={`${item.id}-${sportLabel}`}
-                              className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
-                            >
-                              {sportLabel}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                            Sport not set
-                          </span>
-                        )}
-
-                        {item.organization_name && (
-                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-                            {item.organization_name}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-4 space-y-2 text-sm text-slate-600">
-                        <p>
-                          <span className="font-medium text-slate-800">Location:</span>{" "}
-                          {item.location || "Not specified"}
-                        </p>
-                        <p>
-                          <span className="font-medium text-slate-800">Current organization:</span>{" "}
-                          {item.organization_name || "Not linked yet"}
-                        </p>
-                      </div>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600">
-                          Public profile coming soon
-                        </span>
-                        <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600">
-                          Messaging next phase
-                        </span>
-                      </div>
+                    <div className="min-w-0">
+                      <h2 className="truncate text-xl font-semibold text-slate-900">
+                        {item.full_name || "Unnamed user"}
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {item.primary_role
+                          ? formatPersonRoleLabel(item.primary_role)
+                          : item.role || "No role yet"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {item.location || "No location yet"}
+                      </p>
                     </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {item.roles.map((role) => (
+                      <span
+                        key={role}
+                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                      >
+                        {formatPersonRoleLabel(role)}
+                      </span>
+                    ))}
+
+                    {getSportLabelsFromValue(item.main_sport).map((sport) => (
+                      <span
+                        key={sport}
+                        className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
+                      >
+                        {sport}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 space-y-2 text-sm text-slate-600">
+                    <p>
+                      <span className="font-medium text-slate-900">Organization:</span>{" "}
+                      {item.organization_name || "Independent"}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -567,43 +595,40 @@ function DiscoverPage() {
         </section>
       </div>
 
-      <div className="space-y-5">
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">How discovery works</h2>
-          <div className="mt-4 space-y-4 text-sm leading-7 text-slate-600">
+      <aside className="space-y-5">
+        <section className="rounded-[32px] bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Discover logic</h2>
+          <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
             <p>
-              Use this page to browse the network by role and sport. In this first version, discovery is based on current profile data and organization links already stored in Asobu.
+              This first discovery layer now understands people with more than one role,
+              like a coach who is also a player.
             </p>
             <p>
-              The next steps will add stronger public profiles, richer filters, achievements, media-first identity, and direct contact flows for scouts and coaches.
+              Team and federation registration remain top-level organization paths, while
+              human accounts stay the real owners behind those entities.
             </p>
           </div>
         </section>
 
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">At a glance</h2>
-          <div className="mt-5 grid grid-cols-1 gap-3">
-            <div className="rounded-[24px] bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Players</p>
-              <p className="mt-2 text-3xl font-bold text-slate-900">
-                {profiles.filter((item) => roleMatchesTab(item.role, "players")).length}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Coaches</p>
-              <p className="mt-2 text-3xl font-bold text-slate-900">
-                {profiles.filter((item) => roleMatchesTab(item.role, "coaches")).length}
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Organizations</p>
-              <p className="mt-2 text-3xl font-bold text-slate-900">
-                {organizations.length}
-              </p>
-            </div>
+        <section className="rounded-[32px] bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">What comes next</h2>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              "Public profiles",
+              "Role-specific visibility",
+              "Achievements",
+              "Chat entry points",
+            ].map((item) => (
+              <span
+                key={item}
+                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+              >
+                {item}
+              </span>
+            ))}
           </div>
         </section>
-      </div>
+      </aside>
     </main>
   );
 }

@@ -1,5 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  buildRoleSelectionMap,
+  formatPersonRoleLabel,
+  getUniquePersonRoles,
+  ORGANIZATION_REGISTRATION_OPTIONS,
+  PERSON_ROLE_OPTIONS,
+  type OrganizationRegistrationType,
+  type PersonRole,
+} from "../lib/identity";
 import { supabase } from "../lib/supabase";
 
 type Profile = {
@@ -35,18 +44,43 @@ type OrganizationWithRole = Organization & {
   member_role: string;
 };
 
+type ProfileRoleRow = {
+  id: number;
+  user_id: string;
+  role: string;
+  sport: string | null;
+  is_primary: boolean;
+  created_at: string | null;
+};
+
+type RoleSelectionState = Record<PersonRole, boolean>;
+
+function getInitials(name: string) {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() || "")
+      .join("") || "A"
+  );
+}
+
 function ProfilePage() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationWithRole[]>([]);
 
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState("");
   const [location, setLocation] = useState("");
   const [mainSport, setMainSport] = useState("");
+  const [selectedRoles, setSelectedRoles] = useState<RoleSelectionState>(
+    buildRoleSelectionMap(["player"])
+  );
+  const [primaryRole, setPrimaryRole] = useState<PersonRole>("player");
 
   const [orgName, setOrgName] = useState("");
-  const [orgType, setOrgType] = useState("community");
+  const [orgType, setOrgType] = useState<OrganizationRegistrationType>("team");
   const [orgSport, setOrgSport] = useState("");
   const [orgLocation, setOrgLocation] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
@@ -56,6 +90,14 @@ function ProfilePage() {
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [message, setMessage] = useState("");
   const [orgMessage, setOrgMessage] = useState("");
+
+  const selectedRoleValues = useMemo(
+    () =>
+      PERSON_ROLE_OPTIONS.filter((option) => selectedRoles[option.value]).map(
+        (option) => option.value
+      ),
+    [selectedRoles]
+  );
 
   useEffect(() => {
     async function loadProfile() {
@@ -79,11 +121,12 @@ function ProfilePage() {
       if (error) {
         console.error("Error loading profile:", error.message);
       } else {
-        setProfile(data as Profile);
-        setFullName(data.full_name || "");
-        setRole(data.role || "");
-        setLocation(data.location || "");
-        setMainSport(data.main_sport || "");
+        const typedProfile = data as Profile;
+        setProfile(typedProfile);
+        setFullName(typedProfile.full_name || "");
+        setLocation(typedProfile.location || "");
+        setMainSport(typedProfile.main_sport || "");
+        await loadProfileRoles(user.id, typedProfile);
       }
 
       await loadOrganizations(user.id);
@@ -92,6 +135,35 @@ function ProfilePage() {
 
     loadProfile();
   }, []);
+
+  async function loadProfileRoles(userId: string, currentProfile: Profile) {
+    const { data, error } = await supabase
+      .from("profile_roles")
+      .select("id, user_id, role, sport, is_primary, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.warn("profile_roles unavailable, falling back to profile.role:", error.message);
+      const fallbackPrimary = getUniquePersonRoles([currentProfile.role])[0] || "player";
+      setSelectedRoles(buildRoleSelectionMap([fallbackPrimary]));
+      setPrimaryRole(fallbackPrimary);
+      return;
+    }
+
+    const typedRoles = (data as ProfileRoleRow[]) || [];
+    const normalizedRoles =
+      typedRoles.length > 0
+        ? getUniquePersonRoles(typedRoles.map((item) => item.role))
+        : getUniquePersonRoles([currentProfile.role]);
+
+    const safeRoles: PersonRole[] = normalizedRoles.length > 0 ? normalizedRoles : ["player"];
+    const primaryFromTable = typedRoles.find((item) => item.is_primary)?.role || currentProfile.role;
+    const safePrimary = getUniquePersonRoles([primaryFromTable])[0] || safeRoles[0];
+
+    setSelectedRoles(buildRoleSelectionMap(safeRoles));
+    setPrimaryRole(safePrimary);
+  }
 
   async function loadOrganizations(userId: string) {
     const { data, error } = await supabase
@@ -127,10 +199,40 @@ function ProfilePage() {
     setOrganizations(mapped);
   }
 
+  function handleRoleToggle(role: PersonRole) {
+    setSelectedRoles((current) => {
+      const next = {
+        ...current,
+        [role]: !current[role],
+      };
+
+      const stillSelected = PERSON_ROLE_OPTIONS.some((option) => next[option.value]);
+
+      if (!stillSelected) {
+        next.player = true;
+      }
+
+      return next;
+    });
+
+    setPrimaryRole((currentPrimary) => {
+      if (currentPrimary === role && selectedRoles[role]) {
+        const remainingRole = PERSON_ROLE_OPTIONS.find((option) => {
+          if (option.value === role) return false;
+          return selectedRoles[option.value];
+        });
+
+        return remainingRole?.value || "player";
+      }
+
+      return currentPrimary;
+    });
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!profileId) return;
+    if (!profileId || selectedRoleValues.length === 0) return;
 
     setSaving(true);
     setMessage("");
@@ -139,7 +241,7 @@ function ProfilePage() {
       .from("profiles")
       .update({
         full_name: fullName,
-        role,
+        role: primaryRole,
         location,
         main_sport: mainSport,
       })
@@ -147,21 +249,46 @@ function ProfilePage() {
 
     if (error) {
       setMessage(`Error: ${error.message}`);
-    } else {
-      setProfile((prev) =>
-        prev
-          ? {
-              ...prev,
-              full_name: fullName,
-              role,
-              location,
-              main_sport: mainSport,
-            }
-          : prev
-      );
-      setMessage("Profile updated successfully.");
+      setSaving(false);
+      return;
     }
 
+    const { error: deleteRolesError } = await supabase
+      .from("profile_roles")
+      .delete()
+      .eq("user_id", profileId);
+
+    if (deleteRolesError) {
+      console.warn("Could not replace profile_roles:", deleteRolesError.message);
+    } else {
+      const roleRows = selectedRoleValues.map((role) => ({
+        user_id: profileId,
+        role,
+        sport: mainSport.trim() || null,
+        is_primary: role === primaryRole,
+      }));
+
+      const { error: insertRolesError } = await supabase
+        .from("profile_roles")
+        .insert(roleRows);
+
+      if (insertRolesError) {
+        console.warn("Could not save profile_roles:", insertRolesError.message);
+      }
+    }
+
+    setProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            full_name: fullName,
+            role: primaryRole,
+            location,
+            main_sport: mainSport,
+          }
+        : prev
+    );
+    setMessage("Profile updated successfully.");
     setSaving(false);
   }
 
@@ -205,7 +332,7 @@ function ProfilePage() {
     }
 
     setOrgName("");
-    setOrgType("community");
+    setOrgType("team");
     setOrgSport("");
     setOrgLocation("");
     setOrgDescription("");
@@ -242,17 +369,39 @@ function ProfilePage() {
           <div className="h-48 bg-gradient-to-r from-blue-700 via-sky-500 to-emerald-500" />
 
           <div className="p-6">
-            <div className="-mt-20 h-28 w-28 rounded-full border-4 border-white bg-slate-300 shadow-md" />
+            <div className="-mt-20 flex h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
+              {getInitials(profile.full_name || fullName || "Asobu User")}
+            </div>
 
             <h1 className="mt-4 text-3xl font-bold text-slate-900">
               {profile.full_name || "No name yet"}
             </h1>
 
-            <p className="mt-2 text-slate-600">{profile.role || "No role yet"}</p>
+            <p className="mt-2 text-slate-600">
+              {formatPersonRoleLabel(primaryRole)}
+            </p>
 
             <p className="mt-1 text-slate-500">
-              {profile.location || "No location yet"}
+              {profile.location || location || "No location yet"}
             </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {selectedRoleValues.map((role) => (
+                <span
+                  key={role}
+                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                >
+                  {formatPersonRoleLabel(role)}
+                  {role === primaryRole ? " · primary" : ""}
+                </span>
+              ))}
+
+              {(profile.main_sport || mainSport) && (
+                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                  {profile.main_sport || mainSport}
+                </span>
+              )}
+            </div>
 
             <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="rounded-2xl bg-slate-50 p-4">
@@ -263,9 +412,9 @@ function ProfilePage() {
               </div>
 
               <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-sm text-slate-500">Role</p>
+                <p className="text-sm text-slate-500">Primary role</p>
                 <p className="mt-2 font-semibold text-slate-900">
-                  {profile.role || "Empty"}
+                  {formatPersonRoleLabel(primaryRole)}
                 </p>
               </div>
 
@@ -299,15 +448,44 @@ function ProfilePage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Role
+                  Roles
                 </label>
-                <input
-                  type="text"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {PERSON_ROLE_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRoles[option.value]}
+                        onChange={() => handleRoleToggle(option.value)}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Primary role
+                </label>
+                <select
+                  value={primaryRole}
+                  onChange={(e) => setPrimaryRole(e.target.value as PersonRole)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  placeholder="athlete, coach, founder..."
-                />
+                >
+                  {selectedRoleValues.map((role) => (
+                    <option key={role} value={role}>
+                      {formatPersonRoleLabel(role)}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  Multi-role people are now supported in the data model. Role-specific sport
+                  specialization can be refined later.
+                </p>
               </div>
 
               <div>
@@ -376,12 +554,14 @@ function ProfilePage() {
                 </label>
                 <select
                   value={orgType}
-                  onChange={(e) => setOrgType(e.target.value)}
+                  onChange={(e) => setOrgType(e.target.value as OrganizationRegistrationType)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
                 >
-                  <option value="team">Team</option>
-                  <option value="club">Club</option>
-                  <option value="community">Community</option>
+                  {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

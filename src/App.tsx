@@ -9,7 +9,20 @@ import MessagesPage from "./pages/MessagesPage";
 import AuthPage from "./pages/AuthPage";
 import OrganizationPage from "./pages/OrganizationPage";
 import OrganizationsListPage from "./pages/OrganizationsListPage";
+import { normalizePersonRole } from "./lib/identity";
 import { supabase } from "./lib/supabase";
+
+type MinimalProfile = {
+  id: string;
+  full_name: string | null;
+  role: string | null;
+  location: string | null;
+  main_sport: string | null;
+};
+
+type ProfileRoleRow = {
+  id: number;
+};
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -31,7 +44,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    async function ensureProfile() {
+    async function ensureProfileAndRoles() {
       if (!session?.user) return;
 
       const userId = session.user.id;
@@ -39,7 +52,7 @@ function App() {
 
       const { data: existingProfile, error: fetchError } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, full_name, role, location, main_sport")
         .eq("id", userId)
         .maybeSingle();
 
@@ -48,24 +61,69 @@ function App() {
         return;
       }
 
+      let profile: MinimalProfile;
+
       if (!existingProfile) {
         const fallbackName = email ? email.split("@")[0] : "New User";
 
         const { error: insertError } = await supabase.from("profiles").insert({
           id: userId,
           full_name: fallbackName,
-          role: "athlete",
+          role: "player",
           location: "",
           main_sport: "",
         });
 
         if (insertError) {
           console.error("Error creating profile:", insertError.message);
+          return;
         }
+
+        profile = {
+          id: userId,
+          full_name: fallbackName,
+          role: "player",
+          location: "",
+          main_sport: "",
+        };
+      } else {
+        profile = existingProfile as MinimalProfile;
+      }
+
+      const normalizedPrimaryRole = normalizePersonRole(profile.role);
+
+      if (!normalizedPrimaryRole) {
+        return;
+      }
+
+      const { data: existingRoles, error: rolesError } = await supabase
+        .from("profile_roles")
+        .select("id")
+        .eq("user_id", userId)
+        .limit(1);
+
+      if (rolesError) {
+        console.warn("profile_roles not ready yet or unavailable:", rolesError.message);
+        return;
+      }
+
+      if (((existingRoles as ProfileRoleRow[]) || []).length > 0) {
+        return;
+      }
+
+      const { error: insertRoleError } = await supabase.from("profile_roles").insert({
+        user_id: userId,
+        role: normalizedPrimaryRole,
+        sport: profile.main_sport?.trim() || null,
+        is_primary: true,
+      });
+
+      if (insertRoleError) {
+        console.warn("Could not create default profile role:", insertRoleError.message);
       }
     }
 
-    ensureProfile();
+    ensureProfileAndRoles();
   }, [session]);
 
   async function handleLogout() {
