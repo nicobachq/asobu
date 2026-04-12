@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import Navbar from "./components/Navbar";
 import FeedPage from "./pages/FeedPage";
+import DiscoverPage from "./pages/DiscoverPage";
 import ProfilePage from "./pages/ProfilePage";
 import MessagesPage from "./pages/MessagesPage";
 import AuthPage from "./pages/AuthPage";
@@ -89,6 +90,7 @@ function App() {
 
       <Routes>
         <Route path="/" element={<FeedPage />} />
+        <Route path="/discover" element={<DiscoverPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/organizations" element={<OrganizationsListPage />} />
