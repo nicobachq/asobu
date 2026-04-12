@@ -170,6 +170,14 @@ function OrganizationPage() {
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 
+  const [editMode, setEditMode] = useState(false);
+  const [orgName, setOrgName] = useState("");
+  const [orgType, setOrgType] = useState("community");
+  const [orgSport, setOrgSport] = useState("");
+  const [orgLocation, setOrgLocation] = useState("");
+  const [orgDescription, setOrgDescription] = useState("");
+  const [savingOrganization, setSavingOrganization] = useState(false);
+
   const [posts, setPosts] = useState<Post[]>([]);
   const [likes, setLikes] = useState<PostLike[]>([]);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -179,6 +187,7 @@ function OrganizationPage() {
   const [creatingPost, setCreatingPost] = useState(false);
   const [joiningOrganization, setJoiningOrganization] = useState(false);
   const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
+  const [processingMemberId, setProcessingMemberId] = useState<number | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
   const [likingPostId, setLikingPostId] = useState<number | null>(null);
   const [commentingPostId, setCommentingPostId] = useState<number | null>(null);
@@ -186,6 +195,8 @@ function OrganizationPage() {
 
   const canManageOrganization =
     myMembershipRole === "owner" || myMembershipRole === "admin";
+  const canEditOrganization = canManageOrganization;
+  const canManageMembers = myMembershipRole === "owner";
 
   useEffect(() => {
     let isMounted = true;
@@ -325,7 +336,13 @@ function OrganizationPage() {
       return;
     }
 
-    setOrganization(organizationData as Organization);
+    const typedOrganization = organizationData as Organization;
+    setOrganization(typedOrganization);
+    setOrgName(typedOrganization.name || "");
+    setOrgType(typedOrganization.organization_type || "community");
+    setOrgSport(typedOrganization.sport || "");
+    setOrgLocation(typedOrganization.location || "");
+    setOrgDescription(typedOrganization.description || "");
 
     const { data: membershipData, error: membershipError } = await supabase
       .from("organization_members")
@@ -504,6 +521,52 @@ function OrganizationPage() {
     await loadOrganizationData(organizationId, authUserId);
   }
 
+  async function handleSaveOrganization() {
+    if (!organizationId || !organization || !canEditOrganization || !orgName.trim()) {
+      return;
+    }
+
+    setSavingOrganization(true);
+    setPageError("");
+    setPageMessage("");
+
+    const { error } = await supabase
+      .from("organizations")
+      .update({
+        name: orgName.trim(),
+        organization_type: orgType,
+        sport: orgSport.trim() || null,
+        location: orgLocation.trim() || null,
+        description: orgDescription.trim() || null,
+      })
+      .eq("id", organizationId);
+
+    if (error) {
+      console.error("Error updating organization:", error.message);
+      setPageError(`Error: ${error.message}`);
+      setSavingOrganization(false);
+      return;
+    }
+
+    setPageMessage("Organization updated successfully.");
+    setEditMode(false);
+    await refreshOrganizationSection();
+    setSavingOrganization(false);
+  }
+
+  function handleCancelOrganizationEdit() {
+    if (!organization) return;
+
+    setOrgName(organization.name || "");
+    setOrgType(organization.organization_type || "community");
+    setOrgSport(organization.sport || "");
+    setOrgLocation(organization.location || "");
+    setOrgDescription(organization.description || "");
+    setEditMode(false);
+    setPageError("");
+    setPageMessage("");
+  }
+
   async function handleJoinRequest() {
     if (!authUserId || !organizationId || myMembershipRole || hasPendingRequest) return;
 
@@ -633,6 +696,54 @@ function OrganizationPage() {
     setPageMessage("Join request declined.");
     await refreshOrganizationSection();
     setProcessingRequestId(null);
+  }
+
+  async function handleChangeMemberRole(memberId: number, nextRole: "member" | "admin") {
+    if (!canManageMembers) return;
+
+    setProcessingMemberId(memberId);
+    setPageMessage("");
+    setPageError("");
+
+    const { error } = await supabase
+      .from("organization_members")
+      .update({ member_role: nextRole })
+      .eq("id", memberId);
+
+    if (error) {
+      console.error("Error updating member role:", error.message);
+      setPageError(`Error: ${error.message}`);
+      setProcessingMemberId(null);
+      return;
+    }
+
+    setPageMessage(`Member role updated to ${nextRole}.`);
+    await refreshOrganizationSection();
+    setProcessingMemberId(null);
+  }
+
+  async function handleRemoveMember(memberId: number) {
+    if (!canManageMembers) return;
+
+    setProcessingMemberId(memberId);
+    setPageMessage("");
+    setPageError("");
+
+    const { error } = await supabase
+      .from("organization_members")
+      .delete()
+      .eq("id", memberId);
+
+    if (error) {
+      console.error("Error removing member:", error.message);
+      setPageError(`Error: ${error.message}`);
+      setProcessingMemberId(null);
+      return;
+    }
+
+    setPageMessage("Member removed from organization.");
+    await refreshOrganizationSection();
+    setProcessingMemberId(null);
   }
 
   async function handleCreateOrganizationPost() {
@@ -877,6 +988,19 @@ function OrganizationPage() {
                   </button>
                 )}
 
+                {canEditOrganization && !editMode && (
+                  <button
+                    onClick={() => {
+                      setEditMode(true);
+                      setPageError("");
+                      setPageMessage("");
+                    }}
+                    className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Edit organization
+                  </button>
+                )}
+
                 <Link
                   to="/organizations"
                   className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -918,6 +1042,141 @@ function OrganizationPage() {
               <p className={`text-sm ${pageError ? "mt-2" : ""} text-slate-600`}>
                 {pageMessage}
               </p>
+            )}
+          </section>
+        )}
+
+        {canEditOrganization && (
+          <section className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Organization settings
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Update the main details people see on this page.
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                {editMode ? "editing" : "ready"}
+              </span>
+            </div>
+
+            {editMode ? (
+              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Organization name
+                  </label>
+                  <input
+                    type="text"
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Organization type
+                  </label>
+                  <select
+                    value={orgType}
+                    onChange={(e) => setOrgType(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  >
+                    <option value="community">Community</option>
+                    <option value="club">Club</option>
+                    <option value="team">Team</option>
+                    <option value="academy">Academy</option>
+                    <option value="federation">Federation</option>
+                    <option value="brand">Brand</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Main sport
+                  </label>
+                  <input
+                    type="text"
+                    value={orgSport}
+                    onChange={(e) => setOrgSport(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={orgLocation}
+                    onChange={(e) => setOrgLocation(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Description
+                  </label>
+                  <textarea
+                    value={orgDescription}
+                    onChange={(e) => setOrgDescription(e.target.value)}
+                    rows={5}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  />
+                </div>
+
+                <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
+                  <button
+                    onClick={handleCancelOrganizationEdit}
+                    className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveOrganization}
+                    disabled={savingOrganization || !orgName.trim()}
+                    className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {savingOrganization ? "Saving..." : "Save organization"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Name</p>
+                  <p className="mt-2 font-medium text-slate-900">{organization.name}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Type</p>
+                  <p className="mt-2 font-medium text-slate-900">
+                    {organization.organization_type}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Sport</p>
+                  <p className="mt-2 font-medium text-slate-900">
+                    {organization.sport || "Not specified"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Location</p>
+                  <p className="mt-2 font-medium text-slate-900">
+                    {organization.location || "Not specified"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4 md:col-span-2">
+                  <p className="text-sm text-slate-500">Description</p>
+                  <p className="mt-2 font-medium text-slate-900">
+                    {organization.description || "No description yet."}
+                  </p>
+                </div>
+              </div>
             )}
           </section>
         )}
@@ -1004,38 +1263,80 @@ function OrganizationPage() {
             <p className="mt-4 text-sm text-slate-500">No members found.</p>
           ) : (
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-              {members.map((member) => (
-                <div
-                  key={member.id}
-                  className="rounded-2xl border border-slate-200 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">
-                        {member.profiles?.full_name || "Member"}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {member.profiles?.role || "No role yet"}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {member.profiles?.location || "No location yet"}
-                      </p>
-                    </div>
+              {members.map((member) => {
+                const isThisUser = member.user_id === authUserId;
+                const canPromote = canManageMembers && !isThisUser && member.member_role === "member";
+                const canDemote = canManageMembers && !isThisUser && member.member_role === "admin";
+                const canRemove =
+                  canManageMembers && !isThisUser && member.member_role !== "owner";
 
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                      {member.member_role}
-                    </span>
-                  </div>
+                return (
+                  <div
+                    key={member.id}
+                    className="rounded-2xl border border-slate-200 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900">
+                          {member.profiles?.full_name || "Member"}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {member.profiles?.role || "No role yet"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {member.profiles?.location || "No location yet"}
+                        </p>
+                      </div>
 
-                  {member.profiles?.main_sport && (
-                    <div className="mt-3">
-                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                        {member.profiles.main_sport}
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                        {member.member_role}
                       </span>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {member.profiles?.main_sport && (
+                      <div className="mt-3">
+                        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                          {member.profiles.main_sport}
+                        </span>
+                      </div>
+                    )}
+
+                    {(canPromote || canDemote || canRemove) && (
+                      <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                        {canPromote && (
+                          <button
+                            onClick={() => handleChangeMemberRole(member.id, "admin")}
+                            disabled={processingMemberId === member.id}
+                            className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                          >
+                            {processingMemberId === member.id ? "Working..." : "Promote to admin"}
+                          </button>
+                        )}
+
+                        {canDemote && (
+                          <button
+                            onClick={() => handleChangeMemberRole(member.id, "member")}
+                            disabled={processingMemberId === member.id}
+                            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                          >
+                            {processingMemberId === member.id ? "Working..." : "Demote to member"}
+                          </button>
+                        )}
+
+                        {canRemove && (
+                          <button
+                            onClick={() => handleRemoveMember(member.id)}
+                            disabled={processingMemberId === member.id}
+                            className="rounded-2xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                          >
+                            {processingMemberId === member.id ? "Working..." : "Remove member"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
@@ -1264,8 +1565,10 @@ function OrganizationPage() {
           </div>
 
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-            {canManageOrganization
-              ? "You can review join requests and publish organization posts on this page."
+            {canManageMembers
+              ? "You can edit organization details, review join requests, promote or remove members, and publish organization posts on this page."
+              : canManageOrganization
+              ? "You can edit organization details, review join requests, and publish organization posts on this page. Member role changes stay limited to the owner."
               : "You can read the organization page and interact with posts, but management actions stay limited to admins and owners."}
           </div>
         </section>
