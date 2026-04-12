@@ -27,7 +27,7 @@ type MemberCountRow = {
   organization_id: number;
 };
 
-function OrganizationsPage() {
+function OrganizationsListPage() {
   const [loading, setLoading] = useState(true);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [membershipsByOrg, setMembershipsByOrg] = useState<Record<number, string>>({});
@@ -285,4 +285,4 @@ function OrganizationsPage() {
   );
 }
 
-export default OrganizationsPage;
+export default OrganizationsListPage;
