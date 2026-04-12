@@ -85,16 +85,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <Navbar />
-
-      <div className="mx-auto flex max-w-7xl justify-end px-6 pt-4">
-        <button
-          onClick={handleLogout}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Log out
-        </button>
-      </div>
+      <Navbar onLogout={handleLogout} />
 
       <Routes>
         <Route path="/" element={<FeedPage />} />

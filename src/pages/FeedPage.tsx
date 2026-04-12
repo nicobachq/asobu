@@ -404,24 +404,6 @@ function FeedPage() {
     setDeletingCommentId(null);
   }
 
-  const suggestions = [
-    {
-      id: 1,
-      name: "FC Lugano U21",
-      meta: "Football Team · Lugano",
-    },
-    {
-      id: 2,
-      name: "Padel Brothers Ticino",
-      meta: "Community · Lugano",
-    },
-    {
-      id: 3,
-      name: "Coach Elena Rossi",
-      meta: "Volleyball Coach · Switzerland",
-    },
-  ];
-
   return (
     <main className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[290px_minmax(0,1fr)_280px]">
       <ProfileCard profile={profile} />
@@ -449,7 +431,7 @@ function FeedPage() {
         deletingCommentId={deletingCommentId}
         currentUserId={currentUserId}
       />
-      <SuggestionsCard suggestions={suggestions} />
+      <SuggestionsCard manageableOrganizations={manageableOrganizations} />
     </main>
   );
 }
