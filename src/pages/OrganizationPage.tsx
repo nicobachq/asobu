@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { getFileFromInputEvent, revokeObjectUrl, uploadPostImage, validatePostImageFile } from "../lib/media";
 import ProfileCard from "../components/ProfileCard";
 
 type DbProfile = {
@@ -64,6 +65,7 @@ type RawPost = {
   user_id: string;
   organization_id: number | null;
   content: string;
+  image_url: string | null;
   created_at: string | null;
   profiles: RelatedProfile | RelatedProfile[] | null;
   organizations: RelatedOrganization | RelatedOrganization[] | null;
@@ -74,6 +76,7 @@ type Post = {
   user_id: string;
   organization_id: number | null;
   content: string;
+  image_url: string | null;
   created_at: string | null;
   profiles: RelatedProfile | null;
   organizations: RelatedOrganization | null;
@@ -229,6 +232,8 @@ function OrganizationPage() {
   const [likes, setLikes] = useState<PostLike[]>([]);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [newPost, setNewPost] = useState("");
+  const [orgPostImageFile, setOrgPostImageFile] = useState<File | null>(null);
+  const [orgPostImagePreviewUrl, setOrgPostImagePreviewUrl] = useState("");
   const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({});
 
   const [creatingPost, setCreatingPost] = useState(false);
@@ -272,8 +277,9 @@ function OrganizationPage() {
     return () => {
       safeRevokeObjectUrl(logoPreviewUrl);
       safeRevokeObjectUrl(coverPreviewUrl);
+      revokeObjectUrl(orgPostImagePreviewUrl);
     };
-  }, [logoPreviewUrl, coverPreviewUrl]);
+  }, [logoPreviewUrl, coverPreviewUrl, orgPostImagePreviewUrl]);
 
   useEffect(() => {
     let isMounted = true;
@@ -548,7 +554,7 @@ function OrganizationPage() {
     const { data, error } = await supabase
       .from("posts")
       .select(
-        "id, user_id, organization_id, content, created_at, profiles(full_name, role), organizations(id, name, organization_type, logo_url)"
+        "id, user_id, organization_id, content, image_url, created_at, profiles(full_name, role), organizations(id, name, organization_type, logo_url)"
       )
       .eq("organization_id", orgId)
       .order("created_at", { ascending: false });
@@ -1025,8 +1031,33 @@ function OrganizationPage() {
     setLeavingOrganization(false);
   }
 
+  function handleOrganizationPostImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = getFileFromInputEvent(event);
+    event.target.value = "";
+
+    if (!file) return;
+
+    const validationError = validatePostImageFile(file);
+    if (validationError) {
+      setPageError(validationError);
+      return;
+    }
+
+    setPageError("");
+    revokeObjectUrl(orgPostImagePreviewUrl);
+    const previewUrl = URL.createObjectURL(file);
+    setOrgPostImageFile(file);
+    setOrgPostImagePreviewUrl(previewUrl);
+  }
+
+  function handleRemoveOrganizationPostImage() {
+    revokeObjectUrl(orgPostImagePreviewUrl);
+    setOrgPostImageFile(null);
+    setOrgPostImagePreviewUrl("");
+  }
+
   async function handleCreateOrganizationPost() {
-    if (!authUserId || !organizationId || !newPost.trim() || !canManageOrganization) {
+    if (!authUserId || !organizationId || (!newPost.trim() && !orgPostImageFile) || !canManageOrganization) {
       return;
     }
 
@@ -1034,22 +1065,37 @@ function OrganizationPage() {
     setPageMessage("");
     setPageError("");
 
-    const { error } = await supabase.from("posts").insert({
-      user_id: authUserId,
-      organization_id: organizationId,
-      content: newPost.trim(),
-    });
+    try {
+      let uploadedImageUrl: string | null = null;
 
-    if (error) {
-      console.error("Error creating organization post:", error.message);
-      setPageError(`Error: ${error.message}`);
+      if (orgPostImageFile) {
+        uploadedImageUrl = await uploadPostImage(orgPostImageFile, authUserId);
+      }
+
+      const { error } = await supabase.from("posts").insert({
+        user_id: authUserId,
+        organization_id: organizationId,
+        content: newPost.trim(),
+        image_url: uploadedImageUrl,
+      });
+
+      if (error) {
+        console.error("Error creating organization post:", error.message);
+        setPageError(`Error: ${error.message}`);
+        setCreatingPost(false);
+        return;
+      }
+
+      setNewPost("");
+      handleRemoveOrganizationPostImage();
+      await loadOrganizationPosts(organizationId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown upload error.";
+      console.error("Error creating organization post:", message);
+      setPageError(`Error: ${message}`);
+    } finally {
       setCreatingPost(false);
-      return;
     }
-
-    setNewPost("");
-    await loadOrganizationPosts(organizationId);
-    setCreatingPost(false);
   }
 
   async function handleDeletePost(postId: number) {
@@ -1926,10 +1972,48 @@ function OrganizationPage() {
                 className="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-300"
               />
 
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className={smallSecondaryButton + " cursor-pointer"}>
+                    Add image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleOrganizationPostImageChange}
+                    />
+                  </label>
+
+                  {orgPostImagePreviewUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveOrganizationPostImage}
+                      className={smallSecondaryButton}
+                    >
+                      Remove image
+                    </button>
+                  )}
+                </div>
+
+                {orgPostImageFile && (
+                  <p className="mt-3 text-xs text-slate-500">Selected image: {orgPostImageFile.name}</p>
+                )}
+
+                {orgPostImagePreviewUrl && (
+                  <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    <img
+                      src={orgPostImagePreviewUrl}
+                      alt="Organization post preview"
+                      className="max-h-[420px] w-full object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="mt-4 flex justify-end">
                 <button
                   onClick={handleCreateOrganizationPost}
-                  disabled={creatingPost || !newPost.trim()}
+                  disabled={creatingPost || (!newPost.trim() && !orgPostImagePreviewUrl)}
                   className={solidPrimaryButton}
                 >
                   {creatingPost ? "Publishing..." : "Publish organization post"}
@@ -2007,9 +2091,21 @@ function OrganizationPage() {
                       </div>
                     </div>
 
-                    <p className="mt-4 text-sm leading-7 text-slate-700">
-                      {post.content}
-                    </p>
+                    {post.content && (
+                      <p className="mt-4 text-sm leading-7 text-slate-700">
+                        {post.content}
+                      </p>
+                    )}
+
+                    {post.image_url && (
+                      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                        <img
+                          src={post.image_url}
+                          alt={post.content || `${organizationInfo?.name || organization.name} post image`}
+                          className="max-h-[520px] w-full object-cover"
+                        />
+                      </div>
+                    )}
 
                     <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
                       <span>{postLikes.length} likes</span>

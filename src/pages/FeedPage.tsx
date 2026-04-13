@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { supabase } from "../lib/supabase";
+import { getFileFromInputEvent, revokeObjectUrl, uploadPostImage, validatePostImageFile } from "../lib/media";
 import ProfileCard from "../components/ProfileCard";
 import FeedCard from "../components/FeedCard";
 import SuggestionsCard from "../components/SuggestionsCard";
@@ -33,6 +34,7 @@ type RawPost = {
   user_id: string;
   organization_id: number | null;
   content: string;
+  image_url: string | null;
   created_at: string | null;
   profiles: RelatedProfile | RelatedProfile[] | null;
   organizations: RelatedOrganization | RelatedOrganization[] | null;
@@ -43,6 +45,7 @@ type Post = {
   user_id: string;
   organization_id: number | null;
   content: string;
+  image_url: string | null;
   created_at: string | null;
   profiles: RelatedProfile | null;
   organizations: RelatedOrganization | null;
@@ -116,6 +119,8 @@ function FeedPage() {
   >([]);
   const [selectedPublisher, setSelectedPublisher] = useState("me");
   const [newPost, setNewPost] = useState("");
+  const [postImageFile, setPostImageFile] = useState<File | null>(null);
+  const [postImagePreviewUrl, setPostImagePreviewUrl] = useState("");
   const [commentDrafts, setCommentDrafts] = useState<Record<number, string>>({});
   const [creating, setCreating] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
@@ -213,11 +218,17 @@ function FeedPage() {
     loadFeedData();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      revokeObjectUrl(postImagePreviewUrl);
+    };
+  }, [postImagePreviewUrl]);
+
   async function loadPosts() {
     const { data, error } = await supabase
       .from("posts")
       .select(
-        "id, user_id, organization_id, content, created_at, profiles(full_name, role), organizations(id, name, organization_type, logo_url)"
+        "id, user_id, organization_id, content, image_url, created_at, profiles(full_name, role), organizations(id, name, organization_type, logo_url)"
       )
       .order("created_at", { ascending: false });
 
@@ -267,32 +278,71 @@ function FeedPage() {
     setComments(normalizedComments);
   }
 
+  function handlePostImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = getFileFromInputEvent(event);
+    event.target.value = "";
+
+    if (!file) return;
+
+    const validationError = validatePostImageFile(file);
+    if (validationError) {
+      console.error(validationError);
+      return;
+    }
+
+    revokeObjectUrl(postImagePreviewUrl);
+    const previewUrl = URL.createObjectURL(file);
+    setPostImageFile(file);
+    setPostImagePreviewUrl(previewUrl);
+  }
+
+  function handleRemovePostImage() {
+    revokeObjectUrl(postImagePreviewUrl);
+    setPostImageFile(null);
+    setPostImagePreviewUrl("");
+  }
+
   async function handleCreatePost() {
-    if (!newPost.trim() || !currentUserId) return;
+    if (!currentUserId || (!newPost.trim() && !postImageFile)) return;
 
     setCreating(true);
 
     let organizationId: number | null = null;
+    let uploadedImageUrl: string | null = null;
 
     if (selectedPublisher.startsWith("org-")) {
       organizationId = Number(selectedPublisher.replace("org-", ""));
     }
 
-    const { error } = await supabase.from("posts").insert({
-      user_id: currentUserId,
-      organization_id: organizationId,
-      content: newPost.trim(),
-    });
+    try {
+      if (postImageFile) {
+        uploadedImageUrl = await uploadPostImage(postImageFile, currentUserId);
+      }
 
-    if (error) {
-      console.error("Error creating post:", error.message);
+      const { error } = await supabase.from("posts").insert({
+        user_id: currentUserId,
+        organization_id: organizationId,
+        content: newPost.trim(),
+        image_url: uploadedImageUrl,
+      });
+
+      if (error) {
+        console.error("Error creating post:", error.message);
+        setCreating(false);
+        return;
+      }
+
+      setNewPost("");
+      handleRemovePostImage();
+      await loadPosts();
+    } catch (error) {
+      console.error(
+        "Error creating post:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+    } finally {
       setCreating(false);
-      return;
     }
-
-    setNewPost("");
-    await loadPosts();
-    setCreating(false);
   }
 
   async function handleDeletePost(postId: number) {
@@ -417,6 +467,10 @@ function FeedPage() {
         currentProfileName={profile.name}
         newPost={newPost}
         setNewPost={setNewPost}
+        postImagePreviewUrl={postImagePreviewUrl}
+        postImageFileName={postImageFile?.name || ""}
+        onPostImageChange={handlePostImageChange}
+        onRemovePostImage={handleRemovePostImage}
         onCreatePost={handleCreatePost}
         onDeletePost={handleDeletePost}
         onToggleLike={handleToggleLike}

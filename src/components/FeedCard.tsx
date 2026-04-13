@@ -1,10 +1,11 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 
 type Post = {
   id: number;
   user_id: string;
   organization_id: number | null;
   content: string;
+  image_url: string | null;
   created_at: string | null;
   profiles: {
     full_name: string | null;
@@ -51,6 +52,10 @@ type FeedCardProps = {
   currentProfileName: string;
   newPost: string;
   setNewPost: (value: string) => void;
+  postImagePreviewUrl: string;
+  postImageFileName: string;
+  onPostImageChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRemovePostImage: () => void;
   onCreatePost: () => void;
   onDeletePost: (postId: number) => void;
   onToggleLike: (postId: number) => void;
@@ -87,6 +92,10 @@ function FeedCard({
   currentProfileName,
   newPost,
   setNewPost,
+  postImagePreviewUrl,
+  postImageFileName,
+  onPostImageChange,
+  onRemovePostImage,
   onCreatePost,
   onDeletePost,
   onToggleLike,
@@ -106,6 +115,8 @@ function FeedCard({
         (organization) => organization.id === Number(selectedPublisher.replace("org-", ""))
       ) || null
     : null;
+
+  const canPublish = Boolean(newPost.trim() || postImagePreviewUrl);
 
   return (
     <div className="space-y-5">
@@ -169,19 +180,52 @@ function FeedCard({
           </div>
         )}
 
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center rounded-xl bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-100">
+              Add image
+              <input type="file" accept="image/*" className="hidden" onChange={onPostImageChange} />
+            </label>
+
+            {postImagePreviewUrl && (
+              <button
+                type="button"
+                onClick={onRemovePostImage}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-100"
+              >
+                Remove image
+              </button>
+            )}
+          </div>
+
+          {postImageFileName && (
+            <p className="mt-3 text-xs text-slate-500">Selected image: {postImageFileName}</p>
+          )}
+
+          {postImagePreviewUrl && (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <img
+                src={postImagePreviewUrl}
+                alt="Post preview"
+                className="max-h-[420px] w-full object-cover"
+              />
+            </div>
+          )}
+        </div>
+
         <div className="mt-4 flex items-center justify-between gap-4">
           <div className="flex flex-wrap gap-3">
             <span className="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-700">
               Post
             </span>
             <span className="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-700">
-              Result
+              Media
             </span>
           </div>
 
           <button
             onClick={onCreatePost}
-            disabled={creating || !newPost.trim()}
+            disabled={creating || !canPublish}
             className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {creating ? "Posting..." : "Publish"}
@@ -262,7 +306,19 @@ function FeedCard({
                 </div>
               </div>
 
-              <p className="mt-4 text-sm leading-7 text-slate-700">{post.content}</p>
+              {post.content && (
+                <p className="mt-4 text-sm leading-7 text-slate-700">{post.content}</p>
+              )}
+
+              {post.image_url && (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                  <img
+                    src={post.image_url}
+                    alt={post.content || `${displayName} post image`}
+                    className="max-h-[520px] w-full object-cover"
+                  />
+                </div>
+              )}
 
               <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
                 <span>{postLikes.length} likes</span>

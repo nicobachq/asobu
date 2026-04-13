@@ -50,6 +50,13 @@ type OrganizationWithRole = Organization & {
   member_role: string;
 };
 
+type MediaPost = {
+  id: number;
+  content: string;
+  image_url: string | null;
+  created_at: string | null;
+};
+
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
@@ -80,6 +87,7 @@ function PublicProfilePage() {
   const [roles, setRoles] = useState<PersonRole[]>([]);
   const [primaryRole, setPrimaryRole] = useState<PersonRole | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationWithRole[]>([]);
+  const [mediaPosts, setMediaPosts] = useState<MediaPost[]>([]);
   const [pageError, setPageError] = useState("");
 
   useEffect(() => {
@@ -167,6 +175,21 @@ function PublicProfilePage() {
             .filter(Boolean) as OrganizationWithRole[];
 
         setOrganizations(mappedOrganizations);
+      }
+
+      const { data: mediaData, error: mediaError } = await supabase
+        .from("posts")
+        .select("id, content, image_url, created_at")
+        .eq("user_id", id)
+        .not("image_url", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(6);
+
+      if (mediaError) {
+        console.error("Error loading public profile media:", mediaError.message);
+        setMediaPosts([]);
+      } else {
+        setMediaPosts((mediaData as MediaPost[]) || []);
       }
 
       setLoading(false);
@@ -478,10 +501,48 @@ function PublicProfilePage() {
 
           <div className="space-y-6">
             <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Media spotlight</h2>
-              <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-                Photos and short videos will become a visible part of this profile. Public media should eventually help coaches, organizations, and scouts understand the person behind the name.
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900">Media spotlight</h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Public images shared through posts start building the visible side of this sports identity.
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  {mediaPosts.length} visible
+                </span>
               </div>
+
+              {mediaPosts.length === 0 ? (
+                <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+                  No public images yet. Posting photos on Asobu will gradually make this profile feel more credible and alive.
+                </div>
+              ) : (
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {mediaPosts.map((post) => (
+                    <div key={post.id} className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
+                      {post.image_url && (
+                        <img
+                          src={post.image_url}
+                          alt={post.content || `${profile.full_name || "Asobu member"} media`}
+                          className="h-56 w-full object-cover"
+                        />
+                      )}
+                      <div className="p-4">
+                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                          Posted on Asobu
+                        </p>
+                        <p className="mt-2 line-clamp-2 text-sm text-slate-700">
+                          {post.content || "Image post"}
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          {post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recently"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="rounded-[32px] bg-white p-6 shadow-sm">
