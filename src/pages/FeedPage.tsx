@@ -455,37 +455,65 @@ function FeedPage() {
   }
 
   return (
-    <main className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[290px_minmax(0,1fr)_280px]">
-      <ProfileCard profile={profile} />
-      <FeedCard
-        posts={posts}
-        likes={likes}
-        comments={comments}
-        manageableOrganizations={manageableOrganizations}
-        selectedPublisher={selectedPublisher}
-        setSelectedPublisher={setSelectedPublisher}
-        currentProfileName={profile.name}
-        newPost={newPost}
-        setNewPost={setNewPost}
-        postImagePreviewUrl={postImagePreviewUrl}
-        postImageFileName={postImageFile?.name || ""}
-        onPostImageChange={handlePostImageChange}
-        onRemovePostImage={handleRemovePostImage}
-        onCreatePost={handleCreatePost}
-        onDeletePost={handleDeletePost}
-        onToggleLike={handleToggleLike}
-        onAddComment={handleAddComment}
-        onDeleteComment={handleDeleteComment}
-        commentDrafts={commentDrafts}
-        setCommentDrafts={setCommentDrafts}
-        creating={creating}
-        deletingPostId={deletingPostId}
-        likingPostId={likingPostId}
-        commentingPostId={commentingPostId}
-        deletingCommentId={deletingCommentId}
-        currentUserId={currentUserId}
-      />
-      <SuggestionsCard manageableOrganizations={manageableOrganizations} />
+    <main className="px-6 py-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
+          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-6 py-8 text-white">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Feed</p>
+                <h1 className="mt-2 text-3xl font-bold lg:text-4xl">Show your sporting momentum</h1>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-white/75">
+                  Share images, achievements, and updates that make your sports identity more visible across Asobu.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
+                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Posts</p>
+                  <p className="mt-2 text-3xl font-bold">{posts.length}</p>
+                </div>
+                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Organizations</p>
+                  <p className="mt-2 text-3xl font-bold">{manageableOrganizations.length}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[290px_minmax(0,1fr)_300px]">
+          <ProfileCard profile={profile} />
+          <FeedCard
+            posts={posts}
+            likes={likes}
+            comments={comments}
+            manageableOrganizations={manageableOrganizations}
+            selectedPublisher={selectedPublisher}
+            setSelectedPublisher={setSelectedPublisher}
+            currentProfileName={profile.name}
+            newPost={newPost}
+            setNewPost={setNewPost}
+            postImagePreviewUrl={postImagePreviewUrl}
+            postImageFileName={postImageFile?.name || ""}
+            onPostImageChange={handlePostImageChange}
+            onRemovePostImage={handleRemovePostImage}
+            onCreatePost={handleCreatePost}
+            onDeletePost={handleDeletePost}
+            onToggleLike={handleToggleLike}
+            onAddComment={handleAddComment}
+            onDeleteComment={handleDeleteComment}
+            commentDrafts={commentDrafts}
+            setCommentDrafts={setCommentDrafts}
+            creating={creating}
+            deletingPostId={deletingPostId}
+            likingPostId={likingPostId}
+            commentingPostId={commentingPostId}
+            deletingCommentId={deletingCommentId}
+            currentUserId={currentUserId}
+          />
+          <SuggestionsCard manageableOrganizations={manageableOrganizations} />
+        </div>
+      </div>
     </main>
   );
 }

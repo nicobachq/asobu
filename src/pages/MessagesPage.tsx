@@ -13,13 +13,16 @@ type Conversation = {
 type ConversationParticipantRow = {
   conversation_id: number;
   user_id: string;
-  profiles: {
-    full_name: string | null;
-    role: string | null;
-  } | {
-    full_name: string | null;
-    role: string | null;
-  }[] | null;
+  profiles:
+    | {
+        full_name: string | null;
+        role: string | null;
+      }
+    | {
+        full_name: string | null;
+        role: string | null;
+      }[]
+    | null;
 };
 
 type Message = {
@@ -87,7 +90,7 @@ function MessagesPage() {
       setCurrentUserId(user?.id ?? null);
     }
 
-    loadAuthUser();
+    void loadAuthUser();
   }, []);
 
   useEffect(() => {
@@ -120,13 +123,13 @@ function MessagesPage() {
         console.error("Error opening conversation:", error.message);
         setPageError(`Error opening conversation: ${error.message}`);
         setOpeningConversation(false);
-        await loadMessagesPage(userId)
+        await loadMessagesPage(userId);
         return;
       }
 
       const resolvedConversationId = Array.isArray(data)
         ? Number((data[0] as RpcConversationId | undefined) ?? 0)
-        : Number(data as RpcConversationId | null);
+        : Number((data as RpcConversationId | null) ?? 0);
 
       await loadMessagesPage(userId);
       setOpeningConversation(false);
@@ -147,7 +150,6 @@ function MessagesPage() {
 
   useEffect(() => {
     if (!currentUserId || targetUserId) return;
-
     if (conversationId) return;
     if (conversations.length === 0) return;
 
@@ -165,9 +167,7 @@ function MessagesPage() {
 
     if (myParticipantError) {
       console.error("Error loading conversation participants:", myParticipantError.message);
-      setPageError(
-        `Chat is not ready yet in this environment. ${myParticipantError.message}`
-      );
+      setPageError(`Chat is not ready yet in this environment. ${myParticipantError.message}`);
       setConversations([]);
       setMessagesByConversation({});
       setLoading(false);
@@ -301,165 +301,181 @@ function MessagesPage() {
 
   return (
     <main className="px-6 py-6">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <section className="rounded-[32px] bg-white p-5 shadow-sm">
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold text-slate-900">Messages</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              One-to-one conversations with players, coaches, scouts, and sports contacts.
-            </p>
-          </div>
-
-          {pageError && (
-            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {pageError}
-            </div>
-          )}
-
-          {openingConversation && (
-            <div className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
-              Opening conversation...
-            </div>
-          )}
-
-          {loading ? (
-            <p className="text-sm text-slate-500">Loading conversations...</p>
-          ) : conversations.length === 0 ? (
-            <div className="rounded-[24px] border border-dashed border-slate-200 p-6 text-center">
-              <h3 className="text-lg font-semibold text-slate-900">No conversations yet</h3>
-              <p className="mt-2 text-sm text-slate-500">
-                Open a public profile or Discover card and start a conversation from there.
-              </p>
-              <div className="mt-4">
-                <Link
-                  to="/discover"
-                  className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
-                >
-                  Go to discover
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {conversations.map((conversation) => {
-                const isActive = conversation.id === activeConversationId;
-
-                return (
-                  <Link
-                    key={conversation.id}
-                    to={`/messages/${conversation.id}`}
-                    className={`block rounded-[24px] border p-4 transition ${
-                      isActive
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-200 bg-white hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-sm font-semibold">
-                          {conversation.title}
-                        </h3>
-                        <p className={`mt-1 text-xs ${isActive ? "text-white/75" : "text-slate-500"}`}>
-                          {conversation.subtitle}
-                        </p>
-                        <p className={`mt-2 truncate text-sm ${isActive ? "text-white/85" : "text-slate-600"}`}>
-                          {conversation.preview}
-                        </p>
-                      </div>
-                      <span className={`shrink-0 text-xs ${isActive ? "text-white/75" : "text-slate-400"}`}>
-                        {conversation.timeLabel}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-[32px] bg-white shadow-sm">
-          {loading ? (
-            <div className="p-6 text-sm text-slate-500">Loading thread...</div>
-          ) : !activeConversation ? (
-            <div className="flex min-h-[420px] items-center justify-center p-8 text-center">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
+          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-6 py-8 text-white">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Select a conversation</h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  Open an existing thread or start a new one from a public profile.
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Messages</p>
+                <h1 className="mt-2 text-3xl font-bold lg:text-4xl">Keep conversations inside Asobu</h1>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-white/75">
+                  Direct, one-to-one conversations with players, coaches, scouts, and sports contacts.
                 </p>
               </div>
+              <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
+                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Threads</p>
+                  <p className="mt-2 text-3xl font-bold">{conversations.length}</p>
+                </div>
+                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Active</p>
+                  <p className="mt-2 text-3xl font-bold">{activeConversation ? 1 : 0}</p>
+                </div>
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="border-b border-slate-200 px-6 py-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      {activeConversation.title}
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">{activeConversation.subtitle}</p>
-                  </div>
+          </div>
+        </section>
 
-                  {activeConversation.otherUserId && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <section className="rounded-[32px] bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Inbox</h2>
+                <p className="mt-1 text-sm text-slate-500">Open a conversation from Discover or a public profile.</p>
+              </div>
+              {conversations.length > 0 && (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+                  {conversations.length}
+                </span>
+              )}
+            </div>
+
+            {pageError && (
+              <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {pageError}
+              </div>
+            )}
+
+            {openingConversation && (
+              <div className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                Opening conversation...
+              </div>
+            )}
+
+            {loading ? (
+              <p className="text-sm text-slate-500">Loading conversations...</p>
+            ) : conversations.length === 0 ? (
+              <div className="rounded-[24px] border border-dashed border-slate-200 p-6 text-center">
+                <h3 className="text-lg font-semibold text-slate-900">No conversations yet</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  Open a public profile or Discover card and start a conversation from there.
+                </p>
+                <div className="mt-4">
+                  <Link to="/discover" className="inline-flex rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+                    Go to discover
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {conversations.map((conversation) => {
+                  const isActive = conversation.id === activeConversationId;
+                  return (
                     <Link
-                      to={`/profiles/${activeConversation.otherUserId}`}
-                      className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      key={conversation.id}
+                      to={`/messages/${conversation.id}`}
+                      className={`block rounded-[24px] p-4 transition ${
+                        isActive ? "bg-slate-900 text-white shadow-sm" : "bg-slate-50 hover:bg-slate-100"
+                      }`}
                     >
-                      Open profile
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-sm font-semibold">{conversation.title}</h3>
+                          <p className={`mt-1 text-xs uppercase tracking-[0.16em] ${isActive ? "text-white/60" : "text-slate-400"}`}>
+                            {conversation.subtitle}
+                          </p>
+                          <p className={`mt-2 truncate text-sm ${isActive ? "text-white/85" : "text-slate-600"}`}>
+                            {conversation.preview}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 text-xs ${isActive ? "text-white/70" : "text-slate-400"}`}>{conversation.timeLabel}</span>
+                      </div>
                     </Link>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
+            {loading ? (
+              <div className="p-6 text-sm text-slate-500">Loading thread...</div>
+            ) : !activeConversation ? (
+              <div className="flex min-h-[500px] items-center justify-center p-8 text-center">
+                <div>
+                  <h2 className="text-2xl font-semibold text-slate-900">Select a conversation</h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Open an existing thread or start a new one from a public profile.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="border-b border-slate-100 bg-slate-50 px-6 py-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">{activeConversation.title}</h2>
+                      <p className="mt-1 text-sm text-slate-500">{activeConversation.subtitle}</p>
+                    </div>
+
+                    {activeConversation.otherUserId && (
+                      <Link
+                        to={`/profiles/${activeConversation.otherUserId}`}
+                        className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Open profile
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                <div className="min-h-[380px] space-y-4 px-6 py-6">
+                  {activeMessages.length === 0 ? (
+                    <div className="rounded-[24px] border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+                      No messages yet. Start the conversation below.
+                    </div>
+                  ) : (
+                    activeMessages.map((message) => {
+                      const isMine = message.sender_user_id === currentUserId;
+                      return (
+                        <div
+                          key={message.id}
+                          className={`max-w-[78%] rounded-[24px] px-4 py-3 text-sm leading-7 shadow-sm ${
+                            isMine ? "ml-auto bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          <p>{message.body}</p>
+                          <p className={`mt-2 text-[11px] ${isMine ? "text-white/70" : "text-slate-400"}`}>
+                            {message.created_at ? new Date(message.created_at).toLocaleString() : "Just now"}
+                          </p>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
-              </div>
 
-              <div className="space-y-4 px-6 py-6">
-                {activeMessages.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-                    No messages yet. Start the conversation below.
+                <div className="border-t border-slate-100 bg-white px-6 py-5">
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder="Write a message..."
+                      className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={sending || !draft.trim()}
+                      className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {sending ? "Sending..." : "Send"}
+                    </button>
                   </div>
-                ) : (
-                  activeMessages.map((message) => {
-                    const isMine = message.sender_user_id === currentUserId;
-
-                    return (
-                      <div
-                        key={message.id}
-                        className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-6 ${
-                          isMine
-                            ? "ml-auto bg-slate-900 text-white"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        <p>{message.body}</p>
-                        <p className={`mt-2 text-[11px] ${isMine ? "text-white/70" : "text-slate-400"}`}>
-                          {message.created_at ? new Date(message.created_at).toLocaleString() : "Just now"}
-                        </p>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              <div className="border-t border-slate-200 px-6 py-5">
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Write a message..."
-                    className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={sending || !draft.trim()}
-                    className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {sending ? "Sending..." : "Send"}
-                  </button>
                 </div>
-              </div>
-            </>
-          )}
-        </section>
+              </>
+            )}
+          </section>
+        </div>
       </div>
     </main>
   );

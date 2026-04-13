@@ -205,9 +205,13 @@ function PublicProfilePage() {
 
   if (loading) {
     return (
-      <main className="px-6 py-6">
-        <div className="mx-auto max-w-6xl rounded-[32px] bg-white p-6 shadow-sm">
-          Loading profile...
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-5xl px-6 py-20">
+          <div className="animate-pulse space-y-4">
+            <div className="h-48 rounded-2xl bg-slate-200" />
+            <div className="h-6 w-48 rounded bg-slate-200" />
+            <div className="h-4 w-32 rounded bg-slate-200" />
+          </div>
         </div>
       </main>
     );
@@ -215,18 +219,16 @@ function PublicProfilePage() {
 
   if (!profile) {
     return (
-      <main className="px-6 py-6">
-        <div className="mx-auto max-w-6xl rounded-[32px] bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-900">Public profile</h1>
-          <p className="mt-3 text-sm text-slate-600">{pageError || "Profile not found."}</p>
-          <div className="mt-6">
-            <Link
-              to="/discover"
-              className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              Back to discover
-            </Link>
-          </div>
+      <main className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-5xl px-6 py-20 text-center">
+          <h1 className="text-2xl font-semibold text-slate-900">Profile not found</h1>
+          <p className="mt-3 text-slate-500">{pageError || "This profile doesn't exist."}</p>
+          <Link
+            to="/discover"
+            className="mt-8 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+          >
+            Back to discover
+          </Link>
         </div>
       </main>
     );
@@ -245,338 +247,313 @@ function PublicProfilePage() {
   ];
   const readinessScore = readinessChecks.filter(Boolean).length * 20;
   const readinessLabel =
-    readinessScore >= 80 ? "Strong public profile" : readinessScore >= 60 ? "Good foundation" : "Early profile";
+    readinessScore >= 80 ? "Strong" : readinessScore >= 60 ? "Good" : "Early";
   const strongestOrganization = organizations[0] || null;
 
   return (
-    <main className="px-6 py-6">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
-          <div className="h-64 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500" />
+    <main className="min-h-screen bg-slate-50/80">
+      {/* ───── HERO ───── */}
+      <div className="relative">
+        <div className="h-56 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 sm:h-64 lg:h-72" />
 
-          <div className="p-6">
-            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-              <div className="flex-1">
-                <div className="-mt-20 flex h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
-                  {getInitials(profile.full_name || "Asobu User")}
-                </div>
-
-                <h1 className="mt-4 text-3xl font-bold text-slate-900">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="relative -mt-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+            {/* Avatar + Name */}
+            <div className="flex items-end gap-5">
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-lg sm:h-32 sm:w-32">
+                {getInitials(profile.full_name || "Asobu User")}
+              </div>
+              <div className="pb-1 hidden sm:block">
+                <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">
                   {profile.full_name || "Unnamed user"}
                 </h1>
-                <p className="mt-2 text-base text-slate-600">{headline}</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {profile.location || "No location yet"}
-                </p>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {roles.map((role) => (
-                    <span
-                      key={role}
-                      className={`rounded-full px-3 py-1 text-xs font-medium ${
-                        role === primaryRole ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {formatPersonRoleLabel(role)}
-                      {role === primaryRole ? " · primary" : ""}
-                    </span>
-                  ))}
-
-                  {sportLabels.map((sport) => (
-                    <span
-                      key={sport}
-                      className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
-                    >
-                      {sport}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="w-full max-w-[340px] rounded-[28px] bg-slate-50 p-5 xl:min-w-[320px]">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Public profile strength</p>
-                    <p className="mt-1 text-sm text-slate-500">{readinessLabel}</p>
-                  </div>
-                  <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-                    {readinessScore}%
-                  </span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  <div className="rounded-[20px] bg-white p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Roles</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{roles.length}</p>
-                  </div>
-                  <div className="rounded-[20px] bg-white p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Sports</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{Math.max(sportLabels.length, 1)}</p>
-                  </div>
-                  <div className="rounded-[20px] bg-white p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Orgs</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{organizations.length}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {isOwnProfile ? (
-                    <Link
-                      to="/profile"
-                      className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
-                    >
-                      Edit your profile
-                    </Link>
-                  ) : (
-                    <Link
-                      to={`/messages?with=${profile.id}`}
-                      className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
-                    >
-                      Message on Asobu
-                    </Link>
-                  )}
-
-                  <Link
-                    to="/discover"
-                    className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Back to discover
-                  </Link>
-                </div>
+                <p className="mt-1 text-base text-slate-500">{headline}</p>
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="rounded-[28px] bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-900">About this profile</p>
-                <p className="mt-2 text-sm leading-7 text-slate-600">{identityContext}</p>
-                <p className="mt-2 text-sm leading-7 text-slate-600">
-                  This profile is designed to become a trusted sports identity on Asobu, combining roles, organizations, media, achievements, and communication inside one place.
-                </p>
-              </div>
+            {/* Actions */}
+            <div className="flex gap-3 pb-1">
+              {isOwnProfile ? (
+                <Link
+                  to="/profile"
+                  className="inline-flex items-center rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                >
+                  Edit profile
+                </Link>
+              ) : (
+                <Link
+                  to={`/messages?with=${profile.id}`}
+                  className="inline-flex items-center rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                >
+                  Message
+                </Link>
+              )}
+              <Link
+                to="/discover"
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Discover
+              </Link>
+            </div>
+          </div>
 
-              <div className="rounded-[28px] bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-900">Best fit on Asobu</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {openToLabels.length > 0 ? (
-                    openToLabels.map((item) => (
-                      <span key={item} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                        {item}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                      Building identity
-                    </span>
+          {/* Mobile name (below avatar) */}
+          <div className="mt-4 sm:hidden">
+            <h1 className="text-2xl font-bold text-slate-900">
+              {profile.full_name || "Unnamed user"}
+            </h1>
+            <p className="mt-1 text-base text-slate-500">{headline}</p>
+          </div>
+
+          {/* Tags row */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {roles.map((role) => (
+              <span
+                key={role}
+                className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide uppercase ${
+                  role === primaryRole
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {formatPersonRoleLabel(role)}
+              </span>
+            ))}
+            {sportLabels.map((sport) => (
+              <span
+                key={sport}
+                className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold tracking-wide uppercase text-sky-700"
+              >
+                {sport}
+              </span>
+            ))}
+            {profile.location && (
+              <span className="text-xs text-slate-400">
+                ·&nbsp;&nbsp;{profile.location}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ───── BODY ───── */}
+      <div className="mx-auto max-w-5xl px-6 pb-20">
+        {/* ── MEDIA (hero position — most prominent) ── */}
+        <section className="mt-10">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold text-slate-900">Media</h2>
+            <span className="text-xs font-medium text-slate-400">
+              {mediaPosts.length} {mediaPosts.length === 1 ? "post" : "posts"}
+            </span>
+          </div>
+
+          {mediaPosts.length === 0 ? (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+              <p className="text-sm text-slate-400">
+                No media yet — posts with images will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {mediaPosts.map((post, i) => (
+                <div
+                  key={post.id}
+                  className={`group relative overflow-hidden rounded-2xl bg-slate-200 ${
+                    i === 0 ? "col-span-2 row-span-2" : ""
+                  }`}
+                >
+                  {post.image_url && (
+                    <img
+                      src={post.image_url}
+                      alt={post.content || `${profile.full_name || "Asobu member"} media`}
+                      className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${
+                        i === 0 ? "h-72 sm:h-96" : "h-44 sm:h-52"
+                      }`}
+                    />
                   )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                  <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                    <p className="text-xs font-medium text-white line-clamp-2">
+                      {post.content || "Image post"}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-white/70">
+                      {post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recently"}
+                    </p>
+                  </div>
                 </div>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  {strongestOrganization
-                    ? `${profile.full_name || "This member"} is currently most visible through ${strongestOrganization.name} on Asobu.`
-                    : "Independent profiles can still be discovered, messaged, and grow their sports identity on Asobu."}
-                </p>
-              </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── SNAPSHOT ROW ── */}
+        <section className="mt-12">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Primary role</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">
+                {primaryRole ? formatPersonRoleLabel(primaryRole) : "—"}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Main sport</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">
+                {getPrimarySportLabelFromValue(profile.main_sport)}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Organizations</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">
+                {organizations.length > 0 ? organizations.length : "—"}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Profile</p>
+              <p className="mt-2 text-lg font-bold text-slate-900">{readinessScore}%</p>
+              <p className="text-xs text-slate-400">{readinessLabel}</p>
             </div>
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="space-y-6">
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-2xl font-semibold text-slate-900">Overview</h2>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                  Public identity
-                </span>
-              </div>
-
-              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-[24px] bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Primary role</p>
-                  <p className="mt-2 font-semibold text-slate-900">
-                    {primaryRole ? formatPersonRoleLabel(primaryRole) : "No role yet"}
-                  </p>
-                </div>
-                <div className="rounded-[24px] bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Main sport</p>
-                  <p className="mt-2 font-semibold text-slate-900">
-                    {getPrimarySportLabelFromValue(profile.main_sport)}
-                  </p>
-                </div>
-                <div className="rounded-[24px] bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Location</p>
-                  <p className="mt-2 font-semibold text-slate-900">
-                    {profile.location || "Not specified"}
-                  </p>
-                </div>
-                <div className="rounded-[24px] bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Organizations</p>
-                  <p className="mt-2 font-semibold text-slate-900">
-                    {organizations.length > 0 ? `${organizations.length} linked` : "Independent"}
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-semibold text-slate-900">Roles</h2>
-              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {roles.length > 0 ? (
-                  roles.map((role) => (
-                    <div key={role} className="rounded-[24px] bg-slate-50 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold text-slate-900">{formatPersonRoleLabel(role)}</p>
-                        {role === primaryRole && (
-                          <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-                            Primary
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-2 text-sm leading-7 text-slate-600">{ROLE_DESCRIPTIONS[role]}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-[24px] bg-slate-50 p-4 text-sm text-slate-500">
-                    No roles added yet.
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-2xl font-semibold text-slate-900">Organizations</h2>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                  {organizations.length}
-                </span>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {organizations.length > 0 ? (
-                  organizations.map((organization) => (
-                    <Link
-                      key={organization.id}
-                      to={`/organizations/${organization.id}`}
-                      className="flex items-start justify-between gap-4 rounded-[24px] border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white">
-                          {organization.logo_url ? (
-                            <img
-                              src={organization.logo_url}
-                              alt={organization.name}
-                              className="h-full w-full rounded-2xl object-contain p-1.5"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
-                              {getInitials(organization.name)}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-slate-900">{organization.name}</h3>
-                          <p className="mt-1 text-sm text-slate-500 capitalize">
-                            {organization.organization_type || "organization"} · {organization.member_role}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {organization.location || "No location yet"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                        {getPrimarySportLabelFromValue(organization.sport)}
-                      </span>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="rounded-[24px] bg-slate-50 p-4 text-sm text-slate-500">
-                    No organizations linked yet.
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-
-          <div className="space-y-6">
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Media spotlight</h2>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Public images shared through posts start building the visible side of this sports identity.
-                  </p>
-                </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                  {mediaPosts.length} visible
-                </span>
-              </div>
-
-              {mediaPosts.length === 0 ? (
-                <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-                  No public images yet. Posting photos on Asobu will gradually make this profile feel more credible and alive.
-                </div>
-              ) : (
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {mediaPosts.map((post) => (
-                    <div key={post.id} className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
-                      {post.image_url && (
-                        <img
-                          src={post.image_url}
-                          alt={post.content || `${profile.full_name || "Asobu member"} media`}
-                          className="h-56 w-full object-cover"
-                        />
-                      )}
-                      <div className="p-4">
-                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                          Posted on Asobu
-                        </p>
-                        <p className="mt-2 line-clamp-2 text-sm text-slate-700">
-                          {post.content || "Image post"}
-                        </p>
-                        <p className="mt-2 text-xs text-slate-500">
-                          {post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recently"}
-                        </p>
-                      </div>
-                    </div>
+        {/* ── TWO-COLUMN: LEFT content / RIGHT sidebar ── */}
+        <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_300px]">
+          {/* LEFT */}
+          <div className="space-y-10">
+            {/* About */}
+            <section>
+              <h2 className="text-lg font-semibold text-slate-900">About</h2>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">{identityContext}</p>
+              {openToLabels.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {openToLabels.map((item) => (
+                    <span key={item} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                      {item}
+                    </span>
                   ))}
                 </div>
               )}
             </section>
 
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Achievements roadmap</h2>
-              <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-                Achievements, coach recognition, and milestone badges will live here. This section is intentionally structured now so the profile can become more trusted over time.
-              </div>
+            {/* Roles */}
+            <section>
+              <h2 className="text-lg font-semibold text-slate-900">Roles</h2>
+              {roles.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  {roles.map((role) => (
+                    <div
+                      key={role}
+                      className="flex items-start gap-4 rounded-2xl bg-white p-5 shadow-sm"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-600 uppercase">
+                        {role[0]}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-900">{formatPersonRoleLabel(role)}</p>
+                          {role === primaryRole && (
+                            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white uppercase tracking-wider">
+                              Primary
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">{ROLE_DESCRIPTIONS[role]}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-slate-400">No roles added yet.</p>
+              )}
             </section>
 
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Sporting history</h2>
-              <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-                Sporting history will later connect organizations, teams, milestones, and development stages into a more complete athletic journey.
-              </div>
+            {/* Organizations */}
+            <section>
+              <h2 className="text-lg font-semibold text-slate-900">Organizations</h2>
+              {organizations.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  {organizations.map((org) => (
+                    <Link
+                      key={org.id}
+                      to={`/organizations/${org.id}`}
+                      className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-white overflow-hidden">
+                        {org.logo_url ? (
+                          <img src={org.logo_url} alt={org.name} className="h-full w-full object-contain p-1" />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
+                            {getInitials(org.name)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-slate-900">{org.name}</p>
+                        <p className="mt-0.5 text-xs text-slate-400 capitalize">
+                          {org.organization_type || "Organization"} · {org.member_role}
+                          {org.location ? ` · ${org.location}` : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold text-sky-700 uppercase tracking-wider">
+                        {getPrimarySportLabelFromValue(org.sport)}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-slate-400">No organizations linked yet.</p>
+              )}
             </section>
 
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Connect on Asobu</h2>
-              <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+            {/* Sporting History */}
+            <section>
+              <h2 className="text-lg font-semibold text-slate-900">Sporting history</h2>
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
+                <p className="text-sm text-slate-400">
+                  Timeline of teams, milestones, and development stages — coming soon.
+                </p>
+              </div>
+            </section>
+          </div>
+
+          {/* RIGHT SIDEBAR */}
+          <div className="space-y-6">
+            {/* Achievements */}
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900">Achievements</h3>
+              <div className="mt-3 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
+                <p className="text-xs text-slate-400">Badges and recognition will appear here.</p>
+              </div>
+            </div>
+
+            {/* Strongest affiliation */}
+            {strongestOrganization && (
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-slate-900">Primary affiliation</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  Most visible through <span className="font-medium text-slate-700">{strongestOrganization.name}</span>
+                </p>
+              </div>
+            )}
+
+            {/* CTA */}
+            <div className="rounded-2xl bg-slate-900 p-5 text-white">
+              <h3 className="text-sm font-semibold">Connect on Asobu</h3>
+              <p className="mt-2 text-xs leading-relaxed text-slate-300">
                 {isOwnProfile
-                  ? "Your public profile is now the destination people reach from Discover. Keep shaping it so messaging and opportunities happen in a stronger context."
-                  : "If this profile looks relevant to you, start the conversation directly on Asobu and keep the relationship inside the platform."}
-              </div>
+                  ? "This is your public profile — keep shaping it to attract opportunities."
+                  : "Interested? Start a conversation directly on the platform."}
+              </p>
               {!isOwnProfile && (
                 <Link
                   to={`/messages?with=${profile.id}`}
-                  className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
                 >
                   Message this member
                 </Link>
               )}
-            </section>
+            </div>
           </div>
-        </section>
+        </div>
       </div>
     </main>
   );

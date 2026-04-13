@@ -153,15 +153,11 @@ function DiscoverPage() {
       setLoading(false);
     }
 
-    loadDiscoverPage();
+    void loadDiscoverPage();
   }, []);
 
   async function loadCurrentUserProfile(userId: string) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
 
     if (error) {
       console.error("Error loading discover profile card:", error.message);
@@ -298,9 +294,7 @@ function DiscoverPage() {
 
     const normalizedProfiles: DiscoverProfile[] = typedProfiles.map((item) => {
       const fallbackRoles = getUniquePersonRoles([item.role]);
-      const resolvedRoles = rolesByUserId[item.id]?.length
-        ? rolesByUserId[item.id]
-        : fallbackRoles;
+      const resolvedRoles = rolesByUserId[item.id]?.length ? rolesByUserId[item.id] : fallbackRoles;
       const resolvedPrimaryRole =
         primaryRoleByUserId[item.id] || resolvedRoles[0] || normalizePersonRole(item.role);
 
@@ -340,19 +334,15 @@ function DiscoverPage() {
     }
 
     const counts: Record<number, number> = {};
-
     for (const row of (data as MemberCountRow[]) || []) {
       counts[row.organization_id] = (counts[row.organization_id] || 0) + 1;
     }
-
     setMemberCountsByOrg(counts);
   }
 
   const filteredProfiles = useMemo(() => {
     return profiles.filter((item) => {
-      if (!roleMatchesTab(item.roles, activeTab)) {
-        return false;
-      }
+      if (!roleMatchesTab(item.roles, activeTab)) return false;
 
       const normalizedSearch = searchTerm.trim().toLowerCase();
       const matchesSearch =
@@ -372,9 +362,7 @@ function DiscoverPage() {
 
   const filteredOrganizations = useMemo(() => {
     return organizations.filter((item) => {
-      if (activeTab !== "organizations") {
-        return false;
-      }
+      if (activeTab !== "organizations") return false;
 
       const normalizedSearch = searchTerm.trim().toLowerCase();
       const matchesSearch =
@@ -400,320 +388,298 @@ function DiscoverPage() {
     [profiles, organizations]
   );
 
-  const resultCount =
-    activeTab === "organizations" ? filteredOrganizations.length : filteredProfiles.length;
+  const resultCount = activeTab === "organizations" ? filteredOrganizations.length : filteredProfiles.length;
 
   return (
-    <main className="mx-auto grid max-w-7xl grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[290px_minmax(0,1fr)_300px]">
-      <ProfileCard profile={profile} />
-
-      <div className="space-y-5">
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">
-                Discover
-              </p>
-              <h1 className="mt-2 text-3xl font-bold text-slate-900">
-                Explore the sports network
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                Search for players, coaches, and organizations across Asobu. This
-                layer now makes multi-role people clearer, so a coach who is also a
-                player does not disappear behind one simple label.
-              </p>
-            </div>
-
-            <div className="rounded-[24px] bg-slate-50 px-4 py-4">
-              <p className="text-sm text-slate-500">Results</p>
-              <p className="mt-2 text-3xl font-bold text-slate-900">{resultCount}</p>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-            {[
-              { key: "players", label: "Players", count: tabCounts.players },
-              { key: "coaches", label: "Coaches", count: tabCounts.coaches },
-              { key: "organizations", label: "Organizations", count: tabCounts.organizations },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key as DiscoverTab)}
-                className={`rounded-[24px] border px-4 py-4 text-left transition ${
-                  activeTab === tab.key
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">{tab.label}</p>
-                    <p className={`mt-1 text-xs ${activeTab === tab.key ? "text-white/75" : "text-slate-500"}`}>
-                      {tab.key === "organizations"
-                        ? "Clubs, teams, federations, and entities"
-                        : tab.key === "players"
-                        ? "Athletes and sports identities"
-                        : "Coaches and technical leaders"}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${
-                      activeTab === tab.key
-                        ? "bg-white/15 text-white"
-                        : "bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
+    <main className="px-6 py-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
+          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-6 py-8 text-white">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Discover</p>
+                <h1 className="mt-2 text-3xl font-bold lg:text-4xl">Explore the sports network</h1>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-white/75">
+                  Search players, coaches, and organizations through a cleaner identity-first Asobu experience.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 text-center backdrop-blur">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Players</p>
+                  <p className="mt-2 text-3xl font-bold">{tabCounts.players}</p>
                 </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Search by name, sport, location, role, or organization
-              </label>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={`Search ${activeTab}...`}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Filter by sport
-              </label>
-              <select
-                value={sportFilter}
-                onChange={(e) => setSportFilter(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-              >
-                {DISCOVER_SPORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 text-center backdrop-blur">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Coaches</p>
+                  <p className="mt-2 text-3xl font-bold">{tabCounts.coaches}</p>
+                </div>
+                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 text-center backdrop-blur">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Orgs</p>
+                  <p className="mt-2 text-3xl font-bold">{tabCounts.organizations}</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
-          {loading ? (
-            <p className="text-sm text-slate-500">Loading discover results...</p>
-          ) : resultCount === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
-              <h2 className="text-lg font-semibold text-slate-900">No results found</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Try another search term, change the sport filter, or broaden the role you
-                are exploring.
-              </p>
-            </div>
-          ) : activeTab === "organizations" ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {filteredOrganizations.map((organization) => (
-                <Link
-                  key={organization.id}
-                  to={`/organizations/${organization.id}`}
-                  className="overflow-hidden rounded-[28px] border border-slate-200 bg-white transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <div
-                    className="h-28 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
-                    style={
-                      organization.cover_image_url
-                        ? {
-                            backgroundImage: `url(${organization.cover_image_url})`,
-                            backgroundSize: "cover",
-                            backgroundPosition: "center",
-                          }
-                        : undefined
-                    }
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[290px_minmax(0,1fr)_300px]">
+          <ProfileCard profile={profile} />
+
+          <div className="space-y-6">
+            <section className="rounded-[32px] bg-white p-6 shadow-sm">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                {[
+                  { key: "players", label: "Players", count: tabCounts.players },
+                  { key: "coaches", label: "Coaches", count: tabCounts.coaches },
+                  { key: "organizations", label: "Organizations", count: tabCounts.organizations },
+                ].map((tab) => {
+                  const isActive = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setActiveTab(tab.key as DiscoverTab)}
+                      className={`rounded-[24px] p-4 text-left transition ${
+                        isActive ? "bg-slate-900 text-white" : "bg-slate-50 hover:bg-slate-100"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${isActive ? "text-white/60" : "text-slate-400"}`}>
+                            Explore
+                          </p>
+                          <h2 className="mt-2 text-lg font-bold">{tab.label}</h2>
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${isActive ? "bg-white/10 text-white" : "bg-white text-slate-700"}`}>
+                          {tab.count}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Search
+                  </label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={`Search ${activeTab}...`}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
                   />
+                </div>
 
-                  <div className="p-5">
-                    <div className="-mt-11 flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-white shadow-sm">
-                          {organization.logo_url ? (
-                            <img
-                              src={organization.logo_url}
-                              alt={organization.name}
-                              className="h-full w-full rounded-[1.1rem] object-contain p-2"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
-                              {getInitials(organization.name)}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="min-w-0 pt-10">
-                          <h2 className="truncate text-xl font-semibold text-slate-900">
-                            {organization.name}
-                          </h2>
-                          <p className="mt-1 text-sm font-medium capitalize text-slate-600">
-                            {organization.organization_type || "organization"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        {memberCountsByOrg[organization.id] || 0} members
-                      </span>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                        {getPrimarySportLabelFromValue(organization.sport)}
-                      </span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 capitalize">
-                        {organization.organization_type || "organization"}
-                      </span>
-                    </div>
-
-                    <p className="mt-4 line-clamp-3 text-sm leading-7 text-slate-600">
-                      {organization.description || "No description yet."}
-                    </p>
-
-                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-500">
-                      <span>{organization.location || "No location"}</span>
-                      <span className="font-medium text-slate-700">Open page</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {filteredProfiles.map((item) => {
-                const isOwnCard = item.id === currentUserId;
-
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-[28px] border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50"
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Sport
+                  </label>
+                  <select
+                    value={sportFilter}
+                    onChange={(e) => setSportFilter(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white">
-                          {getInitials(item.full_name || "Asobu User")}
+                    {DISCOVER_SPORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[32px] bg-white p-6 shadow-sm">
+              {loading ? (
+                <p className="text-sm text-slate-500">Loading discover results...</p>
+              ) : resultCount === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-slate-200 p-10 text-center">
+                  <h2 className="text-lg font-semibold text-slate-900">No results found</h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Try another search term, change the sport filter, or broaden the role you are exploring.
+                  </p>
+                </div>
+              ) : activeTab === "organizations" ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {filteredOrganizations.map((organization) => (
+                    <Link
+                      key={organization.id}
+                      to={`/organizations/${organization.id}`}
+                      className="overflow-hidden rounded-[28px] bg-slate-50 transition hover:bg-slate-100"
+                    >
+                      <div
+                        className="h-32 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+                        style={
+                          organization.cover_image_url
+                            ? {
+                                backgroundImage: `url(${organization.cover_image_url})`,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                              }
+                            : undefined
+                        }
+                      />
+                      <div className="p-5">
+                        <div className="-mt-12 flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-white shadow-sm">
+                              {organization.logo_url ? (
+                                <img
+                                  src={organization.logo_url}
+                                  alt={organization.name}
+                                  className="h-full w-full rounded-[1.1rem] object-contain p-2"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
+                                  {getInitials(organization.name)}
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 pt-10">
+                              <h2 className="truncate text-xl font-bold text-slate-900">{organization.name}</h2>
+                              <p className="mt-1 text-sm uppercase tracking-[0.16em] text-slate-400">
+                                {organization.organization_type || "organization"}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                            {memberCountsByOrg[organization.id] || 0} members
+                          </span>
                         </div>
 
-                        <div className="min-w-0">
-                          <h2 className="truncate text-xl font-semibold text-slate-900">
-                            {item.full_name || "Unnamed user"}
-                          </h2>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {formatRoleSummary(item.roles, item.primary_role)}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {item.location || "No location yet"}
-                          </p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                            {getPrimarySportLabelFromValue(organization.sport)}
+                          </span>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                            Open page
+                          </span>
                         </div>
+
+                        <p className="mt-4 line-clamp-3 text-sm leading-7 text-slate-600">
+                          {organization.description || "No description yet."}
+                        </p>
+
+                        <p className="mt-4 text-sm text-slate-500">{organization.location || "No location"}</p>
                       </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {filteredProfiles.map((item) => {
+                    const isOwnCard = item.id === currentUserId;
+                    const sportLabels = getSportLabelsFromValue(item.main_sport);
 
-                      {item.primary_role && (
-                        <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-                          {formatPersonRoleLabel(item.primary_role)}
-                        </span>
-                      )}
-                    </div>
+                    return (
+                      <article key={item.id} className="overflow-hidden rounded-[28px] bg-white ring-1 ring-slate-200 transition hover:ring-slate-300">
+                        <div className="h-24 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700" />
+                        <div className="p-5">
+                          <div className="-mt-12 flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-slate-900 text-lg font-semibold text-white shadow-sm">
+                                {getInitials(item.full_name || "Asobu User")}
+                              </div>
+                              <div className="min-w-0 pt-8">
+                                <h2 className="truncate text-xl font-bold text-slate-900">{item.full_name || "Unnamed user"}</h2>
+                                <p className="mt-1 text-sm text-slate-500">{formatRoleSummary(item.roles, item.primary_role)}</p>
+                              </div>
+                            </div>
+                            {item.primary_role && (
+                              <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">
+                                {formatPersonRoleLabel(item.primary_role)}
+                              </span>
+                            )}
+                          </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {item.roles.map((role) => (
-                        <span
-                          key={role}
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            role === item.primary_role
-                              ? "bg-slate-900 text-white"
-                              : "bg-slate-100 text-slate-700"
-                          }`}
-                        >
-                          {formatPersonRoleLabel(role)}
-                        </span>
-                      ))}
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {item.roles.map((role) => (
+                              <span
+                                key={role}
+                                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+                                  role === item.primary_role ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                {formatPersonRoleLabel(role)}
+                              </span>
+                            ))}
+                            {sportLabels.map((sport) => (
+                              <span key={sport} className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                                {sport}
+                              </span>
+                            ))}
+                            {item.location && <span className="text-xs text-slate-400">· {item.location}</span>}
+                          </div>
 
-                      {getSportLabelsFromValue(item.main_sport).map((sport) => (
-                        <span
-                          key={sport}
-                          className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
-                        >
-                          {sport}
-                        </span>
-                      ))}
-                    </div>
+                          <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+                            <p className="font-medium text-slate-900">{getIdentityContextLabel(item.roles, item.primary_role)}</p>
+                            <p className="mt-2">
+                              <span className="font-medium text-slate-900">Current organization:</span> {item.organization_name || "Independent"}
+                            </p>
+                          </div>
 
-                    <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                      <p className="font-medium text-slate-900">{getIdentityContextLabel(item.roles, item.primary_role)}</p>
-                      <p className="mt-2">
-                        <span className="font-medium text-slate-900">Current organization:</span>{" "}
-                        {item.organization_name || "Independent"}
-                      </p>
-                    </div>
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
+                            <span className="text-slate-500">{item.organization_name || "Independent"}</span>
+                            <div className="flex flex-wrap gap-2">
+                              {!isOwnCard && (
+                                <Link
+                                  to={`/messages?with=${item.id}`}
+                                  className="rounded-full border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                                >
+                                  Message
+                                </Link>
+                              )}
+                              <Link
+                                to={`/profiles/${item.id}`}
+                                className="rounded-full bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800"
+                              >
+                                View sports profile
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
 
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
-                      <span className="text-slate-500">{item.organization_name || "Independent"}</span>
-                      <div className="flex flex-wrap gap-2">
-                        {!isOwnCard && (
-                          <Link
-                            to={`/messages?with=${item.id}`}
-                            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"
-                          >
-                            Message
-                          </Link>
-                        )}
-                        <Link
-                          to={`/profiles/${item.id}`}
-                          className="rounded-2xl bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800"
-                        >
-                          View sports profile
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+          <aside className="space-y-6">
+            <section className="rounded-[32px] bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Discover logic</h2>
+              <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
+                <p>
+                  People can now appear with clearer multi-role identity. A coach who is also a player is no longer forced into one flat label.
+                </p>
+                <p>
+                  Organizations stay top-level entities, while teams, federations, and communities still remain connected to real human owners.
+                </p>
+              </div>
+            </section>
+
+            <section className="rounded-[32px] bg-slate-900 p-5 text-white shadow-sm">
+              <h2 className="text-lg font-semibold">Profile depth on the way</h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {["Profile depth", "Media identity", "Achievements", "Sporting history"].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white/80"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-4 text-sm leading-7 text-white/75">
+                Discover is becoming the scouting and network layer of Asobu, not just a list of users.
+              </p>
+            </section>
+          </aside>
+        </div>
       </div>
-
-      <aside className="space-y-5">
-        <section className="rounded-[32px] bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Discover logic</h2>
-          <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
-            <p>
-              People can now appear with clearer multi-role identity. A coach who is also
-              a player is no longer forced into one flat label.
-            </p>
-            <p>
-              Organization registration remains a top-level path, while teams,
-              federations, and entities still stay linked to real human owners.
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-[32px] bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Profile depth on the way</h2>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {["Profile depth", "Media identity", "Achievements", "Sporting history"].map(
-              (item) => (
-                <span
-                  key={item}
-                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                >
-                  {item}
-                </span>
-              )
-            )}
-          </div>
-        </section>
-      </aside>
     </main>
   );
 }
