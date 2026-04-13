@@ -248,7 +248,7 @@ function PublicProfilePage() {
                     Edit your profile
                   </Link>
                 ) : (
-                  <Link to="/messages" className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800">
+                  <Link to={`/messages?with=${profile.id}`} className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800">
                     Message on Asobu
                   </Link>
                 )}

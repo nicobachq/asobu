@@ -153,6 +153,7 @@ function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profiles/:id" element={<PublicProfilePage />} />
         <Route path="/messages" element={<MessagesPage />} />
+        <Route path="/messages/:conversationId" element={<MessagesPage />} />
         <Route path="/organizations" element={<OrganizationsListPage />} />
         <Route path="/organizations/:id" element={<OrganizationPage />} />
       </Routes>

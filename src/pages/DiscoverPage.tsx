@@ -127,6 +127,7 @@ function DiscoverPage() {
     openTo: ["Teams", "Clubs", "Communities"],
   });
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<DiscoverProfile[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [memberCountsByOrg, setMemberCountsByOrg] = useState<Record<number, number>>({});
@@ -141,6 +142,8 @@ function DiscoverPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      setCurrentUserId(user?.id ?? null);
 
       if (user) {
         await loadCurrentUserProfile(user.id);
@@ -587,76 +590,94 @@ function DiscoverPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {filteredProfiles.map((item) => (
-                <Link
-                  key={item.id}
-                  to={`/profiles/${item.id}`}
-                  className="rounded-[28px] border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white">
-                        {getInitials(item.full_name || "Asobu User")}
+              {filteredProfiles.map((item) => {
+                const isOwnCard = item.id === currentUserId;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-[28px] border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white">
+                          {getInitials(item.full_name || "Asobu User")}
+                        </div>
+
+                        <div className="min-w-0">
+                          <h2 className="truncate text-xl font-semibold text-slate-900">
+                            {item.full_name || "Unnamed user"}
+                          </h2>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {formatRoleSummary(item.roles, item.primary_role)}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {item.location || "No location yet"}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="min-w-0">
-                        <h2 className="truncate text-xl font-semibold text-slate-900">
-                          {item.full_name || "Unnamed user"}
-                        </h2>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {formatRoleSummary(item.roles, item.primary_role)}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {item.location || "No location yet"}
-                        </p>
-                      </div>
+                      {item.primary_role && (
+                        <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+                          {formatPersonRoleLabel(item.primary_role)}
+                        </span>
+                      )}
                     </div>
 
-                    {item.primary_role && (
-                      <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
-                        {formatPersonRoleLabel(item.primary_role)}
-                      </span>
-                    )}
-                  </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {item.roles.map((role) => (
+                        <span
+                          key={role}
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            role === item.primary_role
+                              ? "bg-slate-900 text-white"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {formatPersonRoleLabel(role)}
+                        </span>
+                      ))}
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {item.roles.map((role) => (
-                      <span
-                        key={role}
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
-                          role === item.primary_role
-                            ? "bg-slate-900 text-white"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {formatPersonRoleLabel(role)}
-                      </span>
-                    ))}
+                      {getSportLabelsFromValue(item.main_sport).map((sport) => (
+                        <span
+                          key={sport}
+                          className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
+                        >
+                          {sport}
+                        </span>
+                      ))}
+                    </div>
 
-                    {getSportLabelsFromValue(item.main_sport).map((sport) => (
-                      <span
-                        key={sport}
-                        className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
-                      >
-                        {sport}
-                      </span>
-                    ))}
-                  </div>
+                    <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                      <p className="font-medium text-slate-900">{getIdentityContextLabel(item.roles, item.primary_role)}</p>
+                      <p className="mt-2">
+                        <span className="font-medium text-slate-900">Current organization:</span>{" "}
+                        {item.organization_name || "Independent"}
+                      </p>
+                    </div>
 
-                  <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                    <p className="font-medium text-slate-900">{getIdentityContextLabel(item.roles, item.primary_role)}</p>
-                    <p className="mt-2">
-                      <span className="font-medium text-slate-900">Current organization:</span>{" "}
-                      {item.organization_name || "Independent"}
-                    </p>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
+                      <span className="text-slate-500">{item.organization_name || "Independent"}</span>
+                      <div className="flex flex-wrap gap-2">
+                        {!isOwnCard && (
+                          <Link
+                            to={`/messages?with=${item.id}`}
+                            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            Message
+                          </Link>
+                        )}
+                        <Link
+                          to={`/profiles/${item.id}`}
+                          className="rounded-2xl bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800"
+                        >
+                          Open profile
+                        </Link>
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm text-slate-500">
-                    <span>{item.organization_name || "Independent"}</span>
-                    <span className="font-medium text-slate-900">Open profile</span>
-                  </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
