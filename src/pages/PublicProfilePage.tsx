@@ -10,7 +10,7 @@ import {
   normalizePersonRole,
   type PersonRole,
 } from '../lib/identity';
-import { mergeSkillEntriesWithTemplate, resolveSkillTemplate, type SkillEntryValue, type SkillValidationSummary } from '../lib/skills';
+import { getSkillQuerySportKeys, mergeSkillEntriesWithTemplate, resolveSkillTemplate, seedSkillEntriesFromLegacy, type SkillEntryValue, type SkillValidationSummary } from '../lib/skills';
 import { getPositionLabel } from '../lib/positions';
 import { getPrimarySportLabelFromValue, getSportLabelsFromValue } from '../lib/sports';
 import { supabase } from '../lib/supabase';
@@ -170,8 +170,10 @@ function PublicProfilePage() {
   const [mediaPosts, setMediaPosts] = useState<MediaPost[]>([]);
   const [historyEntries, setHistoryEntries] = useState<SportingHistoryEntry[]>([]);
   const [skillEntries, setSkillEntries] = useState<ProfileSkillEntry[]>([]);
+  const [skillDisplayEntries, setSkillDisplayEntries] = useState<SkillEntryValue[]>([]);
   const [skillValidationSummaries, setSkillValidationSummaries] = useState<Record<string, SkillValidationSummary>>({});
   const [mySkillVotes, setMySkillVotes] = useState<Record<string, number>>({});
+  const [usingLegacySkillSeed, setUsingLegacySkillSeed] = useState(false);
   const [canCurrentUserVote, setCanCurrentUserVote] = useState(false);
   const [pageError, setPageError] = useState('');
   const [validationMessage, setValidationMessage] = useState('');
@@ -330,20 +332,27 @@ function PublicProfilePage() {
         .from('profile_skill_entries')
         .select('*')
         .eq('user_id', id)
-        .eq('sport', skillTemplateForProfile.key)
+        .in('sport', getSkillQuerySportKeys(skillTemplateForProfile))
+        .order('updated_at', { ascending: false, nullsFirst: false })
         .order('skill_key', { ascending: true });
 
       if (skillError) {
         console.warn('profile_skill_entries unavailable on public profile:', skillError.message);
         setSkillEntries([]);
+        setSkillDisplayEntries([]);
         setSkillValidationSummaries({});
         setMySkillVotes({});
+        setUsingLegacySkillSeed(false);
       } else {
         const typedSkillEntries = (skillData as ProfileSkillEntry[]) || [];
-        setSkillEntries(typedSkillEntries);
+        const actualEntries = typedSkillEntries.filter((entry) => entry.sport === skillTemplateForProfile.key);
 
-        if (typedSkillEntries.length > 0) {
-          const entryMap = new Map(typedSkillEntries.map((entry) => [entry.id, entry.skill_key]));
+        if (actualEntries.length > 0) {
+          setSkillEntries(actualEntries);
+          setSkillDisplayEntries(actualEntries);
+          setUsingLegacySkillSeed(false);
+
+          const entryMap = new Map(actualEntries.map((entry) => [entry.id, entry.skill_key]));
 
           const { data: summaryData, error: summaryError } = await supabase.rpc(
             'get_skill_validation_summary_for_profile',
@@ -399,8 +408,26 @@ function PublicProfilePage() {
             setMySkillVotes({});
           }
         } else {
-          setSkillValidationSummaries({});
-          setMySkillVotes({});
+          const legacySourceKey = skillTemplateForProfile.legacySportKeys.find((key) =>
+            typedSkillEntries.some((entry) => entry.sport === key)
+          );
+
+          if (legacySourceKey) {
+            const legacyEntries = typedSkillEntries.filter((entry) => entry.sport === legacySourceKey);
+            setSkillEntries([]);
+            setSkillDisplayEntries(
+              seedSkillEntriesFromLegacy(skillTemplateForProfile, legacySourceKey, legacyEntries)
+            );
+            setSkillValidationSummaries({});
+            setMySkillVotes({});
+            setUsingLegacySkillSeed(true);
+          } else {
+            setSkillEntries([]);
+            setSkillDisplayEntries([]);
+            setSkillValidationSummaries({});
+            setMySkillVotes({});
+            setUsingLegacySkillSeed(false);
+          }
         }
       }
 
@@ -416,6 +443,7 @@ function PublicProfilePage() {
   );
 
   const headline = formatRoleSummary(roles, primaryRole);
+  const hasSkillIdentity = skillDisplayEntries.length > 0;
   const identityContext = getIdentityContextLabel(roles, primaryRole);
   const openToLabels = getOpenToLabelsForRoles(roles);
   const readinessChecks = [
@@ -432,7 +460,7 @@ function PublicProfilePage() {
   const strongestOrganization = organizations[0] || null;
   const mergedSkillCards = mergeSkillEntriesWithTemplate(
     skillTemplate,
-    skillEntries as SkillEntryValue[],
+    skillDisplayEntries,
     skillValidationSummaries
   );
   const radarPoints = mergedSkillCards.map((skill) => ({
@@ -458,7 +486,7 @@ function PublicProfilePage() {
   }
 
   async function handleSetSkillVote(skillKey: string, voteValue: -1 | 0 | 1) {
-    if (!currentUserId || !profile || currentUserId === profile.id || !canCurrentUserVote) return;
+    if (!currentUserId || !profile || currentUserId === profile.id || !canCurrentUserVote || usingLegacySkillSeed) return;
 
     const skillEntry = skillEntries.find((entry) => entry.skill_key === skillKey);
     if (!skillEntry) return;
@@ -863,56 +891,70 @@ function PublicProfilePage() {
                 </span>
               </div>
 
-              <div className="mt-4 rounded-xl bg-slate-50 p-4">
-                <SkillRadarChart points={radarPoints} title={skillTemplate.label} />
-              </div>
+              {usingLegacySkillSeed ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                  This profile is still showing ratings migrated from an earlier generic skill pack. The owner needs to resave this sport-specific version before anonymous voting becomes active.
+                </div>
+              ) : null}
 
-              <div className="mt-4 space-y-3">
-                {mergedSkillCards.map((skill) => {
-                  const myVote = mySkillVotes[skill.key] ?? null;
-                  return (
-                    <div key={skill.key} className="rounded-xl border border-slate-200 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-medium text-slate-900">{skill.label}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Self {skill.selfRating} · Community {skill.communityScore} · {skill.validationSummary.totalCount} anonymous votes
-                          </p>
-                          <p className="mt-1 text-[11px] text-slate-400">
-                            {skill.validationSummary.higherCount} higher · {skill.validationSummary.fairCount} fair · {skill.validationSummary.lowerCount} lower
-                          </p>
+              {hasSkillIdentity ? (
+                <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                  <SkillRadarChart points={radarPoints} title={skillTemplate.label} />
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
+                  <p className="text-xs text-slate-400">No skill identity has been published yet for this sport.</p>
+                </div>
+              )}
+
+              {hasSkillIdentity ? (
+                <div className="mt-4 space-y-3">
+                  {mergedSkillCards.map((skill) => {
+                    const myVote = mySkillVotes[skill.key] ?? null;
+                    return (
+                      <div key={skill.key} className="rounded-xl border border-slate-200 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-slate-900">{skill.label}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Self {skill.selfRating} · Community {skill.communityScore} · {skill.validationSummary.totalCount} anonymous votes
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              {skill.validationSummary.higherCount} higher · {skill.validationSummary.fairCount} fair · {skill.validationSummary.lowerCount} lower
+                            </p>
+                          </div>
                         </div>
+
+                        {!isOwnProfile && !usingLegacySkillSeed && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {([
+                              { label: 'Lower', value: -1 as const },
+                              { label: 'Fair', value: 0 as const },
+                              { label: 'Higher', value: 1 as const },
+                            ]).map((option) => (
+                              <button
+                                key={option.label}
+                                type="button"
+                                onClick={() => handleSetSkillVote(skill.key, option.value)}
+                                disabled={validatingSkillKey === skill.key || !canCurrentUserVote}
+                                className={`rounded-full px-3 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                                  myVote === option.value
+                                    ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                {validatingSkillKey === skill.key && myVote === option.value ? '...' : option.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                    );
+                  })}
+                </div>
+              ) : null}
 
-                      {!isOwnProfile && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {([
-                            { label: 'Lower', value: -1 as const },
-                            { label: 'Fair', value: 0 as const },
-                            { label: 'Higher', value: 1 as const },
-                          ]).map((option) => (
-                            <button
-                              key={option.label}
-                              type="button"
-                              onClick={() => handleSetSkillVote(skill.key, option.value)}
-                              disabled={validatingSkillKey === skill.key || !canCurrentUserVote}
-                              className={`rounded-full px-3 py-1 text-xs font-semibold transition disabled:opacity-50 ${
-                                myVote === option.value
-                                  ? 'bg-slate-900 text-white hover:bg-slate-800'
-                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                              }`}
-                            >
-                              {validatingSkillKey === skill.key && myVote === option.value ? '...' : option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {!isOwnProfile && (
+              {!isOwnProfile && hasSkillIdentity && !usingLegacySkillSeed && (
                 <p className="mt-4 text-xs leading-relaxed text-slate-500">
                   Anonymous skill votes can currently be submitted only by logged-in players and coaches. Team and match-linked restrictions will become stricter after MVP.
                 </p>

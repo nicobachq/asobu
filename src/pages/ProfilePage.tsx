@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SkillRadarChart from '../components/SkillRadarChart';
+import SkillValueBar from '../components/SkillValueBar';
 import {
   buildRoleSelectionMap,
   formatPersonRoleLabel,
@@ -16,9 +17,13 @@ import {
 } from '../lib/identity';
 import {
   buildDefaultSkillRatings,
+  getSkillQuerySportKeys,
+  hasCompleteSkillIdentity,
   mergeSkillEntriesWithTemplate,
   resolveSkillTemplate,
+  seedSkillEntriesFromLegacy,
   type SkillEntryValue,
+  type SkillTemplate,
   type SkillValidationSummary,
 } from '../lib/skills';
 import {
@@ -235,6 +240,8 @@ function ProfilePage() {
   const [skillsAvailable, setSkillsAvailable] = useState(true);
   const [savingSkills, setSavingSkills] = useState(false);
   const [skillMessage, setSkillMessage] = useState('');
+  const [skillSeedMessage, setSkillSeedMessage] = useState('');
+  const [skillSourceSportKey, setSkillSourceSportKey] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -279,20 +286,32 @@ function ProfilePage() {
     [allOrganizations, historyForm.selectedOrganizationId]
   );
 
-  const activeSportValue = profile?.main_sport || mainSport;
+  const activeSportValue = mainSport || profile?.main_sport;
   const activeSkillTemplate = useMemo(
     () => resolveSkillTemplate(activeSportValue),
     [activeSportValue]
+  );
+
+  const skillPreviewEntries = useMemo(
+    () =>
+      activeSkillTemplate.skills.map((skill) => ({
+        skill_key: skill.key,
+        self_rating:
+          skillRatings[skill.key] ??
+          skillEntries.find((entry) => entry.skill_key === skill.key)?.self_rating ??
+          60,
+      })),
+    [activeSkillTemplate, skillEntries, skillRatings]
   );
 
   const mergedSkillCards = useMemo(
     () =>
       mergeSkillEntriesWithTemplate(
         activeSkillTemplate,
-        skillEntries as SkillEntryValue[],
+        skillPreviewEntries,
         skillValidationSummaries
       ),
-    [activeSkillTemplate, skillEntries, skillValidationSummaries]
+    [activeSkillTemplate, skillPreviewEntries, skillValidationSummaries]
   );
 
   const radarPoints = useMemo(
@@ -353,11 +372,11 @@ function ProfilePage() {
   useEffect(() => {
     async function loadSkillsForCurrentTemplate() {
       if (!profileId) return;
-      await loadProfileSkills(profileId, activeSkillTemplate.key);
+      await loadProfileSkills(profileId, activeSkillTemplate);
     }
 
     loadSkillsForCurrentTemplate();
-  }, [profileId, activeSkillTemplate.key]);
+  }, [profileId, activeSkillTemplate]);
 
   async function loadProfileRoles(userId: string, currentProfile: Profile) {
     const { data, error } = await supabase
@@ -455,21 +474,25 @@ function ProfilePage() {
     })));
   }
 
-  async function loadProfileSkills(userId: string, sportKey: string) {
+  async function loadProfileSkills(userId: string, template: SkillTemplate) {
+    const querySportKeys = getSkillQuerySportKeys(template);
     const { data, error } = await supabase
       .from('profile_skill_entries')
       .select('*')
       .eq('user_id', userId)
-      .eq('sport', sportKey)
+      .in('sport', querySportKeys)
+      .order('updated_at', { ascending: false, nullsFirst: false })
       .order('skill_key', { ascending: true });
 
     if (error) {
       console.warn('profile_skill_entries unavailable:', error.message);
       setSkillsAvailable(false);
       setSkillEntries([]);
+      setSkillSourceSportKey(null);
+      setSkillSeedMessage('');
       setSkillRatings(
         Object.fromEntries(
-          buildDefaultSkillRatings(activeSkillTemplate).map((entry) => [entry.skill_key, entry.self_rating])
+          buildDefaultSkillRatings(template).map((entry) => [entry.skill_key, entry.self_rating])
         )
       );
       setSkillValidationSummaries({});
@@ -477,53 +500,81 @@ function ProfilePage() {
     }
 
     const typedEntries = (data as ProfileSkillEntry[]) || [];
+    const actualEntries = typedEntries.filter((entry) => entry.sport === template.key);
     setSkillsAvailable(true);
-    setSkillEntries(typedEntries);
+
+    if (actualEntries.length > 0) {
+      setSkillEntries(actualEntries);
+      setSkillSourceSportKey(template.key);
+      setSkillSeedMessage('');
+      setSkillRatings(
+        Object.fromEntries(
+          mergeSkillEntriesWithTemplate(template, actualEntries).map((entry) => [entry.key, entry.selfRating])
+        )
+      );
+
+      const entryMap = new Map(actualEntries.map((entry) => [entry.id, entry.skill_key]));
+
+      const { data: summaryData, error: summaryError } = await supabase.rpc(
+        'get_skill_validation_summary_for_profile',
+        {
+          p_profile_user_id: userId,
+          p_sport: template.key,
+        }
+      );
+
+      if (summaryError) {
+        console.warn('Skill validation summary unavailable:', summaryError.message);
+        setSkillValidationSummaries({});
+        return;
+      }
+
+      const summaries: Record<string, SkillValidationSummary> = {};
+
+      for (const row of (summaryData as SkillValidationSummaryRow[]) || []) {
+        const skillKey = entryMap.get(row.skill_entry_id);
+        if (!skillKey) continue;
+        summaries[skillKey] = {
+          lowerCount: row.lower_count || 0,
+          fairCount: row.fair_count || 0,
+          higherCount: row.higher_count || 0,
+          totalCount: row.total_count || 0,
+          averageVote: Number(row.average_vote || 0),
+        };
+      }
+
+      setSkillValidationSummaries(summaries);
+      return;
+    }
+
+    const legacySourceKey = template.legacySportKeys.find((key) =>
+      typedEntries.some((entry) => entry.sport === key)
+    );
+
+    if (legacySourceKey) {
+      const legacyEntries = typedEntries.filter((entry) => entry.sport === legacySourceKey);
+      const seededEntries = seedSkillEntriesFromLegacy(template, legacySourceKey, legacyEntries);
+      setSkillEntries([]);
+      setSkillSourceSportKey(legacySourceKey);
+      setSkillSeedMessage(
+        `Your earlier ${legacySourceKey === 'generic' ? 'generic' : legacySourceKey} ratings were used to prefill this new ${template.sportLabel.toLowerCase()} skill pack. Save once to lock the sport-specific version.`
+      );
+      setSkillRatings(
+        Object.fromEntries(seededEntries.map((entry) => [entry.skill_key, entry.self_rating]))
+      );
+      setSkillValidationSummaries({});
+      return;
+    }
+
+    setSkillEntries([]);
+    setSkillSourceSportKey(null);
+    setSkillSeedMessage('');
     setSkillRatings(
       Object.fromEntries(
-        mergeSkillEntriesWithTemplate(activeSkillTemplate, typedEntries).map((entry) => [
-          entry.key,
-          entry.selfRating,
-        ])
+        buildDefaultSkillRatings(template).map((entry) => [entry.skill_key, entry.self_rating])
       )
     );
-
-    if (typedEntries.length === 0) {
-      setSkillValidationSummaries({});
-      return;
-    }
-
-    const entryMap = new Map(typedEntries.map((entry) => [entry.id, entry.skill_key]));
-
-    const { data: summaryData, error: summaryError } = await supabase.rpc(
-      'get_skill_validation_summary_for_profile',
-      {
-        p_profile_user_id: userId,
-        p_sport: sportKey,
-      }
-    );
-
-    if (summaryError) {
-      console.warn('Skill validation summary unavailable:', summaryError.message);
-      setSkillValidationSummaries({});
-      return;
-    }
-
-    const summaries: Record<string, SkillValidationSummary> = {};
-
-    for (const row of (summaryData as SkillValidationSummaryRow[]) || []) {
-      const skillKey = entryMap.get(row.skill_entry_id);
-      if (!skillKey) continue;
-      summaries[skillKey] = {
-        lowerCount: row.lower_count || 0,
-        fairCount: row.fair_count || 0,
-        higherCount: row.higher_count || 0,
-        totalCount: row.total_count || 0,
-        averageVote: Number(row.average_vote || 0),
-      };
-    }
-
-    setSkillValidationSummaries(summaries);
+    setSkillValidationSummaries({});
   }
 
   function handleRoleToggle(role: PersonRole) {
@@ -822,7 +873,7 @@ function ProfilePage() {
       return;
     }
 
-    await loadProfileSkills(profileId, activeSkillTemplate.key);
+    await loadProfileSkills(profileId, activeSkillTemplate);
     setSkillMessage('Skill identity updated.');
     setSavingSkills(false);
   }
@@ -842,7 +893,7 @@ function ProfilePage() {
     selectedRoleValues.length > 0,
     organizations.length > 0,
     historyEntries.length > 0,
-    mergedSkillCards.length > 0,
+    Boolean(skillSourceSportKey),
   ];
   const publicReadinessScore = Math.round(
     (publicReadinessChecks.filter(Boolean).length / publicReadinessChecks.length) * 100
@@ -856,9 +907,14 @@ function ProfilePage() {
     selectedRoleValues.length === 0 && 'Add at least one role',
     organizations.length === 0 && 'Join or create an organization',
     historyEntries.length === 0 && 'Add your sporting history',
-    mergedSkillCards.length === 0 && 'Build your skill identity',
+    !skillSourceSportKey && 'Build your skill identity',
   ].filter(Boolean) as string[];
   const openToLabels = getOpenToLabelsForRoles(selectedRoleValues);
+  const hasSavedSportSpecificSkills =
+    skillSourceSportKey === activeSkillTemplate.key &&
+    hasCompleteSkillIdentity(activeSkillTemplate, skillEntries as SkillEntryValue[]);
+
+  const isSkillIdentityLocked = hasSavedSportSpecificSkills;
 
   if (!profile) {
     return (
@@ -1095,7 +1151,7 @@ function ProfilePage() {
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Skill identity</h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Set your initial self-assessment, then let anonymous signals from players and coaches gradually shape the public community score.
+                    {activeSkillTemplate.intro}
                   </p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -1135,18 +1191,16 @@ function ProfilePage() {
                             </div>
                           </div>
 
-                          <input
-                            type="range"
-                            min={20}
-                            max={99}
+                          <SkillValueBar
                             value={skillRatings[skill.key] ?? skill.selfRating}
-                            onChange={(e) =>
+                            isLocked={isSkillIdentityLocked}
+                            ariaLabel={`${skill.label} self rating`}
+                            onChange={(nextValue) =>
                               setSkillRatings((current) => ({
                                 ...current,
-                                [skill.key]: Number(e.target.value),
+                                [skill.key]: nextValue,
                               }))
                             }
-                            className="mt-4 w-full"
                           />
 
                           <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
@@ -1161,16 +1215,24 @@ function ProfilePage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={handleSaveSkills}
-                      disabled={savingSkills}
-                      className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                    >
-                      {savingSkills ? 'Saving...' : 'Save skill identity'}
-                    </button>
-                  </div>
+                  {(skillSeedMessage || isSkillIdentityLocked) && (
+                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      {skillSeedMessage || 'This sport-specific skill identity is locked after the first save.'}
+                    </div>
+                  )}
+
+                  {!isSkillIdentityLocked ? (
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={handleSaveSkills}
+                        disabled={savingSkills}
+                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {savingSkills ? 'Saving...' : skillSourceSportKey && skillSourceSportKey !== activeSkillTemplate.key ? 'Save sport-specific skill identity' : 'Save skill identity'}
+                      </button>
+                    </div>
+                  ) : null}
 
                   {skillMessage && <p className="mt-4 text-sm text-slate-600">{skillMessage}</p>}
                 </>
