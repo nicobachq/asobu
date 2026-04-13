@@ -5,6 +5,7 @@ import Navbar from "./components/Navbar";
 import FeedPage from "./pages/FeedPage";
 import DiscoverPage from "./pages/DiscoverPage";
 import ProfilePage from "./pages/ProfilePage";
+import PublicProfilePage from "./pages/PublicProfilePage";
 import MessagesPage from "./pages/MessagesPage";
 import AuthPage from "./pages/AuthPage";
 import OrganizationPage from "./pages/OrganizationPage";
@@ -150,6 +151,7 @@ function App() {
         <Route path="/" element={<FeedPage />} />
         <Route path="/discover" element={<DiscoverPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profiles/:id" element={<PublicProfilePage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/organizations" element={<OrganizationsListPage />} />
         <Route path="/organizations/:id" element={<OrganizationPage />} />

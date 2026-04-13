@@ -588,8 +588,9 @@ function DiscoverPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {filteredProfiles.map((item) => (
-                <div
+                <Link
                   key={item.id}
+                  to={`/profiles/${item.id}`}
                   className="rounded-[28px] border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50"
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -649,7 +650,12 @@ function DiscoverPage() {
                       {item.organization_name || "Independent"}
                     </p>
                   </div>
-                </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm text-slate-500">
+                    <span>{item.organization_name || "Independent"}</span>
+                    <span className="font-medium text-slate-900">Open profile</span>
+                  </div>
+                </Link>
               ))}
             </div>
           )}
@@ -674,7 +680,7 @@ function DiscoverPage() {
         <section className="rounded-[32px] bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">What comes next</h2>
           <div className="mt-4 flex flex-wrap gap-2">
-            {["Public profiles", "Role-specific visibility", "Achievements", "Chat entry points"].map(
+            {["Public profiles", "Media identity", "Achievements", "Chat entry points"].map(
               (item) => (
                 <span
                   key={item}

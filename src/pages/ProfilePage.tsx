@@ -408,10 +408,44 @@ function ProfilePage() {
             </div>
 
             <div className="mt-6 rounded-[28px] bg-slate-50 p-5">
-              <p className="text-sm font-semibold text-slate-900">Identity summary</p>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Identity summary</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    {getIdentityContextLabel(selectedRoleValues, primaryRole)}
+                  </p>
+                </div>
+
+                {profileId && (
+                  <Link
+                    to={`/profiles/${profileId}`}
+                    className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                  >
+                    View public profile
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-[28px] border border-slate-200 p-5">
+              <p className="text-sm font-semibold text-slate-900">Public profile structure</p>
               <p className="mt-2 text-sm leading-7 text-slate-600">
-                {getIdentityContextLabel(selectedRoleValues, primaryRole)}
+                Your public Asobu identity is now being shaped as a more serious sports profile. This destination will keep growing with media, achievements, sporting history, and richer discovery context.
               </p>
+
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { title: "Overview", text: "Name, identity, location, and sports context." },
+                  { title: "Media", text: "Photos and short videos will become part of your public presence." },
+                  { title: "Achievements", text: "Badges, recognition, and milestones will live here." },
+                  { title: "Sporting history", text: "Teams, clubs, and development journey will be structured here." },
+                ].map((item) => (
+                  <div key={item.title} className="rounded-[24px] bg-slate-50 p-4">
+                    <p className="font-semibold text-slate-900">{item.title}</p>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">{item.text}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
