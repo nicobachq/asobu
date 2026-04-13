@@ -84,3 +84,82 @@ export function getUniquePersonRoles(values: Array<string | null | undefined>) {
 
   return Array.from(new Set(roles));
 }
+
+export function getSecondaryRoles(
+  roles: PersonRole[],
+  primaryRole: PersonRole | null | undefined
+) {
+  return roles.filter((role) => role !== primaryRole);
+}
+
+export function formatRoleSummary(
+  roles: PersonRole[],
+  primaryRole: PersonRole | null | undefined
+) {
+  const uniqueRoles = getUniquePersonRoles(roles);
+  const safePrimary = primaryRole && uniqueRoles.includes(primaryRole) ? primaryRole : uniqueRoles[0] || null;
+
+  if (!safePrimary) return "No role yet";
+
+  const secondaryRoles = getSecondaryRoles(uniqueRoles, safePrimary);
+  const primaryLabel = formatPersonRoleLabel(safePrimary);
+
+  if (secondaryRoles.length === 0) {
+    return primaryLabel;
+  }
+
+  if (secondaryRoles.length === 1) {
+    return `${primaryLabel} · also ${formatPersonRoleLabel(secondaryRoles[0])}`;
+  }
+
+  return `${primaryLabel} · ${secondaryRoles.length} additional roles`;
+}
+
+export function getIdentityContextLabel(
+  roles: PersonRole[],
+  primaryRole: PersonRole | null | undefined
+) {
+  const uniqueRoles = getUniquePersonRoles(roles);
+  const safePrimary = primaryRole && uniqueRoles.includes(primaryRole) ? primaryRole : uniqueRoles[0] || null;
+
+  if (!safePrimary) return "Identity still being completed";
+
+  const secondaryRoles = getSecondaryRoles(uniqueRoles, safePrimary);
+
+  if (secondaryRoles.length === 0) {
+    return `Primary identity: ${formatPersonRoleLabel(safePrimary)}`;
+  }
+
+  if (secondaryRoles.length === 1) {
+    return `Primary identity: ${formatPersonRoleLabel(safePrimary)} · secondary role: ${formatPersonRoleLabel(
+      secondaryRoles[0]
+    )}`;
+  }
+
+  return `Primary identity: ${formatPersonRoleLabel(safePrimary)} · ${secondaryRoles.length} secondary roles`;
+}
+
+export function getOpenToLabelsForRoles(roles: PersonRole[]) {
+  const uniqueRoles = getUniquePersonRoles(roles);
+  const labels = new Set<string>();
+
+  if (uniqueRoles.includes("player")) {
+    labels.add("Teams");
+    labels.add("Coaches");
+    labels.add("Scouts");
+  }
+
+  if (uniqueRoles.includes("coach")) {
+    labels.add("Players");
+    labels.add("Teams");
+    labels.add("Federations");
+  }
+
+  if (uniqueRoles.includes("scout")) {
+    labels.add("Players");
+    labels.add("Coaches");
+    labels.add("Organizations");
+  }
+
+  return Array.from(labels);
+}

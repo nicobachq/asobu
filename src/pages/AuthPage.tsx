@@ -2,11 +2,14 @@ import { useMemo, useState } from "react";
 import {
   buildRoleSelectionMap,
   formatPersonRoleLabel,
+  formatRoleSummary,
+  getIdentityContextLabel,
   ORGANIZATION_REGISTRATION_OPTIONS,
   PERSON_ROLE_OPTIONS,
   type OrganizationRegistrationType,
   type PersonRole,
 } from "../lib/identity";
+import { SPORT_REGISTRATION_OPTIONS } from "../lib/sports";
 import { supabase } from "../lib/supabase";
 
 type SignUpPath = "person" | "organization";
@@ -111,6 +114,11 @@ function AuthPage() {
           setMessage("Your primary role must be one of your selected roles.");
           return;
         }
+
+        if (!mainSport.trim()) {
+          setMessage("Please choose your main sport.");
+          return;
+        }
       }
 
       if (signUpPath === "organization") {
@@ -120,7 +128,7 @@ function AuthPage() {
         }
 
         if (!organizationSport.trim()) {
-          setMessage("Please enter the organization sport.");
+          setMessage("Please choose the organization sport.");
           return;
         }
       }
@@ -145,9 +153,7 @@ function AuthPage() {
       }
 
       const profileRoleValue =
-        signUpPath === "person"
-          ? primaryRole
-          : `${organizationType} owner`;
+        signUpPath === "person" ? primaryRole : `${organizationType} owner`;
 
       const profileSportValue =
         signUpPath === "person" ? mainSport.trim() || null : organizationSport.trim() || null;
@@ -156,7 +162,10 @@ function AuthPage() {
         id: userId,
         full_name: fullName.trim(),
         role: profileRoleValue,
-        location: signUpPath === "person" ? location.trim() || null : organizationLocation.trim() || null,
+        location:
+          signUpPath === "person"
+            ? location.trim() || null
+            : organizationLocation.trim() || null,
         main_sport: profileSportValue,
       });
 
@@ -173,9 +182,7 @@ function AuthPage() {
           is_primary: role === primaryRole,
         }));
 
-        const { error: rolesError } = await supabase
-          .from("profile_roles")
-          .insert(roleRows);
+        const { error: rolesError } = await supabase.from("profile_roles").insert(roleRows);
 
         if (rolesError) {
           console.warn("profile_roles setup skipped:", rolesError.message);
@@ -222,7 +229,11 @@ function AuthPage() {
       setMessage(
         signUpPath === "person"
           ? `Account created as ${formatPersonRoleLabel(primaryRole)}.`
-          : `Account and ${ORGANIZATION_REGISTRATION_OPTIONS.find((option) => option.value === organizationType)?.label?.toLowerCase() || "organization"} created successfully.`
+          : `Account and ${
+              ORGANIZATION_REGISTRATION_OPTIONS.find(
+                (option) => option.value === organizationType
+              )?.label?.toLowerCase() || "organization"
+            } created successfully.`
       );
     } catch {
       setMessage("Something went wrong.");
@@ -233,7 +244,7 @@ function AuthPage() {
 
   return (
     <main className="px-6 py-10">
-      <div className="mx-auto max-w-3xl rounded-3xl bg-white p-6 shadow-sm">
+      <div className="mx-auto max-w-4xl rounded-[32px] bg-white p-6 shadow-sm">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">
@@ -246,46 +257,90 @@ function AuthPage() {
             </p>
 
             {!isLogin && (
-              <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  Registration path
-                </p>
+              <>
+                <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Registration path
+                  </p>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {[
-                    {
-                      key: "person",
-                      label: "I am joining as a person",
-                      description: "Player, coach, or scout",
-                    },
-                    {
-                      key: "organization",
-                      label: "I am registering an organization",
-                      description: "Team, federation, club, entity, or community",
-                    },
-                  ].map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setSignUpPath(option.key as SignUpPath)}
-                      className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                        signUpPath === option.key
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      <div className="font-medium">{option.label}</div>
-                      <div
-                        className={`mt-1 text-xs ${
-                          signUpPath === option.key ? "text-white/75" : "text-slate-500"
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {[
+                      {
+                        key: "person",
+                        label: "I am joining as a person",
+                        description: "Player, coach, or scout",
+                      },
+                      {
+                        key: "organization",
+                        label: "I am registering an organization",
+                        description: "Team, federation, club, entity, or community",
+                      },
+                    ].map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setSignUpPath(option.key as SignUpPath)}
+                        className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                          signUpPath === option.key
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
                         }`}
                       >
-                        {option.description}
-                      </div>
-                    </button>
-                  ))}
+                        <div className="font-medium">{option.label}</div>
+                        <div
+                          className={`mt-1 text-xs ${
+                            signUpPath === option.key ? "text-white/75" : "text-slate-500"
+                          }`}
+                        >
+                          {option.description}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                <div className="mt-6 rounded-[28px] bg-slate-50 p-5">
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {signUpPath === "person" ? "Identity model" : "Organization model"}
+                  </h2>
+                  {signUpPath === "person" ? (
+                    <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
+                      <p>
+                        One account can carry more than one sports role. A coach can also
+                        be a player, and that identity can become searchable later across
+                        Discover.
+                      </p>
+                      <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
+                        <p className="font-semibold text-slate-900">
+                          {formatRoleSummary(selectedRoleValues, primaryRole)}
+                        </p>
+                        <p className="mt-1 text-slate-500">
+                          {getIdentityContextLabel(selectedRoleValues, primaryRole)}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
+                      <p>
+                        Teams and federations are top-level registration paths, but every
+                        organization still has a real human owner behind it.
+                      </p>
+                      <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
+                        <p className="font-semibold text-slate-900">
+                          {ORGANIZATION_REGISTRATION_OPTIONS.find(
+                            (option) => option.value === organizationType
+                          )?.label || "Organization"}
+                        </p>
+                        <p className="mt-1 text-slate-500">
+                          {ORGANIZATION_REGISTRATION_OPTIONS.find(
+                            (option) => option.value === organizationType
+                          )?.description || ""}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
 
@@ -373,9 +428,8 @@ function AuthPage() {
                         ))}
                       </select>
                       <p className="mt-2 text-xs text-slate-500">
-                        You can hold more than one role. For now, your main sport is shared
-                        across selected roles. Deeper role-specific sport settings will come
-                        later.
+                        Your primary role stays the main public label, while your other
+                        roles remain part of the deeper identity model.
                       </p>
                     </div>
 
@@ -383,13 +437,18 @@ function AuthPage() {
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Main sport
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={mainSport}
                         onChange={(e) => setMainSport(e.target.value)}
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="Football"
-                      />
+                      >
+                        <option value="">Choose a sport</option>
+                        {SPORT_REGISTRATION_OPTIONS.map((sport) => (
+                          <option key={sport.value} value={sport.label}>
+                            {sport.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>
@@ -437,24 +496,24 @@ function AuthPage() {
                           </option>
                         ))}
                       </select>
-                      <p className="mt-2 text-xs text-slate-500">
-                        {ORGANIZATION_REGISTRATION_OPTIONS.find(
-                          (option) => option.value === organizationType
-                        )?.description || ""}
-                      </p>
                     </div>
 
                     <div>
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         Main sport
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={organizationSport}
                         onChange={(e) => setOrganizationSport(e.target.value)}
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="Football"
-                      />
+                      >
+                        <option value="">Choose a sport</option>
+                        {SPORT_REGISTRATION_OPTIONS.map((sport) => (
+                          <option key={sport.value} value={sport.label}>
+                            {sport.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>

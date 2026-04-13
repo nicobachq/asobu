@@ -23,14 +23,12 @@ export const DISCOVER_SPORT_OPTIONS: SportOption[] = [
   { value: "other", label: "Other" },
 ];
 
+export const SPORT_REGISTRATION_OPTIONS: SportOption[] = DISCOVER_SPORT_OPTIONS.filter(
+  (option) => option.value !== "all"
+);
+
 const SPORT_ALIASES: Record<string, string[]> = {
-  football: [
-    "football",
-    "soccer",
-    "calcio",
-    "futbol",
-    "fútbol",
-  ],
+  football: ["football", "soccer", "calcio", "futbol", "fútbol"],
   futsal: ["futsal", "5-a-side", "five-a-side", "indoor football"],
   basketball: ["basketball"],
   volleyball: ["volleyball", "beach volleyball", "volley"],
@@ -115,4 +113,8 @@ export function getSportLabelsFromValue(value: string | null | undefined): strin
   return getNormalizedSportsFromValue(value).map(
     (sportValue) => SPORT_LABEL_BY_VALUE[sportValue] || "Other"
   );
+}
+
+export function getPrimarySportLabelFromValue(value: string | null | undefined) {
+  return getSportLabelsFromValue(value)[0] || "Not specified";
 }

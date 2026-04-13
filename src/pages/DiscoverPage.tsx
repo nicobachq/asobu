@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import {
   formatPersonRoleLabel,
+  formatRoleSummary,
+  getIdentityContextLabel,
+  getOpenToLabelsForRoles,
   getUniquePersonRoles,
   normalizePersonRole,
   type PersonRole,
@@ -10,6 +13,7 @@ import {
 import {
   DISCOVER_SPORT_OPTIONS,
   getNormalizedSportsFromValue,
+  getPrimarySportLabelFromValue,
   getSportLabelsFromValue,
 } from "../lib/sports";
 import ProfileCard from "../components/ProfileCard";
@@ -190,13 +194,32 @@ function DiscoverPage() {
       }
     }
 
+    let resolvedRoles = getUniquePersonRoles([dbProfile.role]);
+    let resolvedPrimaryRole = normalizePersonRole(dbProfile.role);
+
+    const { data: profileRoleData, error: profileRoleError } = await supabase
+      .from("profile_roles")
+      .select("user_id, role, sport, is_primary")
+      .eq("user_id", userId);
+
+    if (!profileRoleError) {
+      const typedRoleRows = (profileRoleData as ProfileRoleRow[]) || [];
+      if (typedRoleRows.length > 0) {
+        resolvedRoles = getUniquePersonRoles(typedRoleRows.map((item) => item.role));
+        resolvedPrimaryRole =
+          normalizePersonRole(typedRoleRows.find((item) => item.is_primary)?.role) ||
+          resolvedRoles[0] ||
+          null;
+      }
+    }
+
     setProfile({
       name: dbProfile.full_name || "No name yet",
-      role: dbProfile.role || "No role yet",
+      role: formatRoleSummary(resolvedRoles, resolvedPrimaryRole),
       location: dbProfile.location || "No location yet",
-      sports: dbProfile.main_sport ? [dbProfile.main_sport] : [],
+      sports: getSportLabelsFromValue(dbProfile.main_sport),
       organization: firstOrganization,
-      openTo: ["Teams", "Clubs", "Communities"],
+      openTo: getOpenToLabelsForRoles(resolvedRoles),
     });
   }
 
@@ -305,9 +328,7 @@ function DiscoverPage() {
   }
 
   async function loadMemberCounts() {
-    const { data, error } = await supabase
-      .from("organization_members")
-      .select("organization_id");
+    const { data, error } = await supabase.from("organization_members").select("organization_id");
 
     if (error) {
       console.error("Error loading member counts:", error.message);
@@ -367,6 +388,15 @@ function DiscoverPage() {
     });
   }, [organizations, activeTab, searchTerm, sportFilter]);
 
+  const tabCounts = useMemo(
+    () => ({
+      players: profiles.filter((item) => item.roles.includes("player")).length,
+      coaches: profiles.filter((item) => item.roles.includes("coach")).length,
+      organizations: organizations.length,
+    }),
+    [profiles, organizations]
+  );
+
   const resultCount =
     activeTab === "organizations" ? filteredOrganizations.length : filteredProfiles.length;
 
@@ -386,8 +416,8 @@ function DiscoverPage() {
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
                 Search for players, coaches, and organizations across Asobu. This
-                first discovery layer already understands people with more than one
-                role.
+                layer now makes multi-role people clearer, so a coach who is also a
+                player does not disappear behind one simple label.
               </p>
             </div>
 
@@ -397,22 +427,42 @@ function DiscoverPage() {
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
             {[
-              { key: "players", label: "Players" },
-              { key: "coaches", label: "Coaches" },
-              { key: "organizations", label: "Organizations" },
+              { key: "players", label: "Players", count: tabCounts.players },
+              { key: "coaches", label: "Coaches", count: tabCounts.coaches },
+              { key: "organizations", label: "Organizations", count: tabCounts.organizations },
             ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key as DiscoverTab)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                className={`rounded-[24px] border px-4 py-4 text-left transition ${
                   activeTab === tab.key
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                {tab.label}
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{tab.label}</p>
+                    <p className={`mt-1 text-xs ${activeTab === tab.key ? "text-white/75" : "text-slate-500"}`}>
+                      {tab.key === "organizations"
+                        ? "Clubs, teams, federations, and entities"
+                        : tab.key === "players"
+                        ? "Athletes and sports identities"
+                        : "Coaches and technical leaders"}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      activeTab === tab.key
+                        ? "bg-white/15 text-white"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </div>
               </button>
             ))}
           </div>
@@ -440,8 +490,7 @@ function DiscoverPage() {
                 onChange={(e) => setSportFilter(e.target.value)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
               >
-                <option value="all">All sports</option>
-                {DISCOVER_SPORT_OPTIONS.filter((option) => option.value !== "all").map((option) => (
+                {DISCOVER_SPORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -458,7 +507,8 @@ function DiscoverPage() {
             <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
               <h2 className="text-lg font-semibold text-slate-900">No results found</h2>
               <p className="mt-2 text-sm text-slate-500">
-                Try another search term or change the sport filter.
+                Try another search term, change the sport filter, or broaden the role you
+                are exploring.
               </p>
             </div>
           ) : activeTab === "organizations" ? (
@@ -483,43 +533,43 @@ function DiscoverPage() {
                   />
 
                   <div className="p-5">
-                    <div className="-mt-11 flex items-start gap-3">
-                      <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-white shadow-sm">
-                        {organization.logo_url ? (
-                          <img
-                            src={organization.logo_url}
-                            alt={organization.name}
-                            className="h-full w-full rounded-[1.1rem] object-contain p-2"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
-                            {getInitials(organization.name)}
-                          </div>
-                        )}
-                      </div>
+                    <div className="-mt-11 flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-white shadow-sm">
+                          {organization.logo_url ? (
+                            <img
+                              src={organization.logo_url}
+                              alt={organization.name}
+                              className="h-full w-full rounded-[1.1rem] object-contain p-2"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-semibold text-white">
+                              {getInitials(organization.name)}
+                            </div>
+                          )}
+                        </div>
 
-                      <div className="min-w-0 pt-10">
-                        <h2 className="truncate text-xl font-semibold text-slate-900">
-                          {organization.name}
-                        </h2>
-                        <p className="mt-1 text-sm font-medium text-slate-600 capitalize">
-                          {organization.organization_type || "organization"}
-                        </p>
+                        <div className="min-w-0 pt-10">
+                          <h2 className="truncate text-xl font-semibold text-slate-900">
+                            {organization.name}
+                          </h2>
+                          <p className="mt-1 text-sm font-medium capitalize text-slate-600">
+                            {organization.organization_type || "organization"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {getSportLabelsFromValue(organization.sport).map((sport) => (
-                        <span
-                          key={sport}
-                          className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
-                        >
-                          {sport}
-                        </span>
-                      ))}
 
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                         {memberCountsByOrg[organization.id] || 0} members
+                      </span>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                        {getPrimarySportLabelFromValue(organization.sport)}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 capitalize">
+                        {organization.organization_type || "organization"}
                       </span>
                     </div>
 
@@ -542,31 +592,41 @@ function DiscoverPage() {
                   key={item.id}
                   className="rounded-[28px] border border-slate-200 p-5 transition hover:border-slate-300 hover:bg-slate-50"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white">
-                      {getInitials(item.full_name || "Asobu User")}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white">
+                        {getInitials(item.full_name || "Asobu User")}
+                      </div>
+
+                      <div className="min-w-0">
+                        <h2 className="truncate text-xl font-semibold text-slate-900">
+                          {item.full_name || "Unnamed user"}
+                        </h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {formatRoleSummary(item.roles, item.primary_role)}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {item.location || "No location yet"}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="min-w-0">
-                      <h2 className="truncate text-xl font-semibold text-slate-900">
-                        {item.full_name || "Unnamed user"}
-                      </h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {item.primary_role
-                          ? formatPersonRoleLabel(item.primary_role)
-                          : item.role || "No role yet"}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {item.location || "No location yet"}
-                      </p>
-                    </div>
+                    {item.primary_role && (
+                      <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+                        {formatPersonRoleLabel(item.primary_role)}
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     {item.roles.map((role) => (
                       <span
                         key={role}
-                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                          role === item.primary_role
+                            ? "bg-slate-900 text-white"
+                            : "bg-slate-100 text-slate-700"
+                        }`}
                       >
                         {formatPersonRoleLabel(role)}
                       </span>
@@ -582,9 +642,10 @@ function DiscoverPage() {
                     ))}
                   </div>
 
-                  <div className="mt-4 space-y-2 text-sm text-slate-600">
-                    <p>
-                      <span className="font-medium text-slate-900">Organization:</span>{" "}
+                  <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                    <p className="font-medium text-slate-900">{getIdentityContextLabel(item.roles, item.primary_role)}</p>
+                    <p className="mt-2">
+                      <span className="font-medium text-slate-900">Current organization:</span>{" "}
                       {item.organization_name || "Independent"}
                     </p>
                   </div>
@@ -600,12 +661,12 @@ function DiscoverPage() {
           <h2 className="text-lg font-semibold text-slate-900">Discover logic</h2>
           <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
             <p>
-              This first discovery layer now understands people with more than one role,
-              like a coach who is also a player.
+              People can now appear with clearer multi-role identity. A coach who is also
+              a player is no longer forced into one flat label.
             </p>
             <p>
-              Team and federation registration remain top-level organization paths, while
-              human accounts stay the real owners behind those entities.
+              Organization registration remains a top-level path, while teams,
+              federations, and entities still stay linked to real human owners.
             </p>
           </div>
         </section>
@@ -613,19 +674,16 @@ function DiscoverPage() {
         <section className="rounded-[32px] bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">What comes next</h2>
           <div className="mt-4 flex flex-wrap gap-2">
-            {[
-              "Public profiles",
-              "Role-specific visibility",
-              "Achievements",
-              "Chat entry points",
-            ].map((item) => (
-              <span
-                key={item}
-                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-              >
-                {item}
-              </span>
-            ))}
+            {["Public profiles", "Role-specific visibility", "Achievements", "Chat entry points"].map(
+              (item) => (
+                <span
+                  key={item}
+                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                >
+                  {item}
+                </span>
+              )
+            )}
           </div>
         </section>
       </aside>

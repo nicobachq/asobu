@@ -3,12 +3,15 @@ import { Link } from "react-router-dom";
 import {
   buildRoleSelectionMap,
   formatPersonRoleLabel,
+  formatRoleSummary,
+  getIdentityContextLabel,
   getUniquePersonRoles,
   ORGANIZATION_REGISTRATION_OPTIONS,
   PERSON_ROLE_OPTIONS,
   type OrganizationRegistrationType,
   type PersonRole,
 } from "../lib/identity";
+import { getPrimarySportLabelFromValue, SPORT_REGISTRATION_OPTIONS } from "../lib/sports";
 import { supabase } from "../lib/supabase";
 
 type Profile = {
@@ -158,7 +161,8 @@ function ProfilePage() {
         : getUniquePersonRoles([currentProfile.role]);
 
     const safeRoles: PersonRole[] = normalizedRoles.length > 0 ? normalizedRoles : ["player"];
-    const primaryFromTable = typedRoles.find((item) => item.is_primary)?.role || currentProfile.role;
+    const primaryFromTable =
+      typedRoles.find((item) => item.is_primary)?.role || currentProfile.role;
     const safePrimary = getUniquePersonRoles([primaryFromTable])[0] || safeRoles[0];
 
     setSelectedRoles(buildRoleSelectionMap(safeRoles));
@@ -366,7 +370,7 @@ function ProfilePage() {
     <main className="px-6 py-6">
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
-          <div className="h-48 bg-gradient-to-r from-blue-700 via-sky-500 to-emerald-500" />
+          <div className="h-52 bg-gradient-to-r from-blue-700 via-sky-500 to-emerald-500" />
 
           <div className="p-6">
             <div className="-mt-20 flex h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
@@ -377,30 +381,37 @@ function ProfilePage() {
               {profile.full_name || "No name yet"}
             </h1>
 
-            <p className="mt-2 text-slate-600">
-              {formatPersonRoleLabel(primaryRole)}
-            </p>
+            <p className="mt-2 text-slate-600">{formatRoleSummary(selectedRoleValues, primaryRole)}</p>
 
-            <p className="mt-1 text-slate-500">
-              {profile.location || location || "No location yet"}
-            </p>
+            <p className="mt-1 text-slate-500">{profile.location || location || "No location yet"}</p>
 
             <div className="mt-4 flex flex-wrap gap-2">
               {selectedRoleValues.map((role) => (
                 <span
                   key={role}
-                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    role === primaryRole
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-700"
+                  }`}
                 >
                   {formatPersonRoleLabel(role)}
                   {role === primaryRole ? " · primary" : ""}
                 </span>
               ))}
 
-              {(profile.main_sport || mainSport) && (
+              {mainSport && (
                 <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                  {profile.main_sport || mainSport}
+                  {getPrimarySportLabelFromValue(mainSport)}
                 </span>
               )}
+            </div>
+
+            <div className="mt-6 rounded-[28px] bg-slate-50 p-5">
+              <p className="text-sm font-semibold text-slate-900">Identity summary</p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                {getIdentityContextLabel(selectedRoleValues, primaryRole)}
+              </p>
             </div>
 
             <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -421,7 +432,7 @@ function ProfilePage() {
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-sm text-slate-500">Main sport</p>
                 <p className="mt-2 font-semibold text-slate-900">
-                  {profile.main_sport || "Empty"}
+                  {getPrimarySportLabelFromValue(profile.main_sport || mainSport)}
                 </p>
               </div>
             </div>
@@ -483,8 +494,8 @@ function ProfilePage() {
                   ))}
                 </select>
                 <p className="mt-2 text-xs text-slate-500">
-                  Multi-role people are now supported in the data model. Role-specific sport
-                  specialization can be refined later.
+                  The primary role stays your main public identity, while the other roles
+                  remain part of your deeper profile structure.
                 </p>
               </div>
 
@@ -505,168 +516,170 @@ function ProfilePage() {
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Main sport
                 </label>
-                <input
-                  type="text"
+                <select
                   value={mainSport}
                   onChange={(e) => setMainSport(e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  placeholder="Football"
-                />
-              </div>
-
-              <div>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
                 >
-                  {saving ? "Saving..." : "Save changes"}
-                </button>
-              </div>
-            </form>
-
-            {message && <p className="mt-4 text-sm text-slate-600">{message}</p>}
-          </div>
-
-          <div className="rounded-3xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-900">Create organization</h2>
-
-            <form
-              onSubmit={handleCreateOrganization}
-              className="mt-6 grid grid-cols-1 gap-4"
-            >
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  placeholder="Asobu Community"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Type
-                </label>
-                <select
-                  value={orgType}
-                  onChange={(e) => setOrgType(e.target.value as OrganizationRegistrationType)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                >
-                  {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  <option value="">Choose a sport</option>
+                  {SPORT_REGISTRATION_OPTIONS.map((sport) => (
+                    <option key={sport.value} value={sport.label}>
+                      {sport.label}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Sport
-                </label>
-                <input
-                  type="text"
-                  value={orgSport}
-                  onChange={(e) => setOrgSport(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  placeholder="Football"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={orgLocation}
-                  onChange={(e) => setOrgLocation(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  placeholder="Lugano"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Description
-                </label>
-                <textarea
-                  value={orgDescription}
-                  onChange={(e) => setOrgDescription(e.target.value)}
-                  className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  placeholder="Short description"
-                />
-              </div>
-
-              <div>
                 <button
                   type="submit"
-                  disabled={creatingOrg || !orgName.trim()}
-                  className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  disabled={saving}
+                  className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
                 >
-                  {creatingOrg ? "Creating..." : "Create organization"}
+                  {saving ? "Saving..." : "Save profile"}
                 </button>
               </div>
+
+              {message && <p className="text-sm text-slate-600">{message}</p>}
             </form>
-
-            {orgMessage && (
-              <p className="mt-4 text-sm text-slate-600">{orgMessage}</p>
-            )}
           </div>
-        </section>
 
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Your organizations</h2>
+          <div className="space-y-6">
+            <section className="rounded-3xl bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-slate-900">Create organization</h2>
 
-          {organizations.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">
-              You are not part of any organization yet.
-            </p>
-          ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              {organizations.map((org) => (
-                <Link
-                  key={org.id}
-                  to={`/organizations/${org.id}`}
-                  className="rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {org.name}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {org.organization_type}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {org.location || "No location"}
-                      </p>
-                    </div>
+              <form onSubmit={handleCreateOrganization} className="mt-6 grid grid-cols-1 gap-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Organization name
+                  </label>
+                  <input
+                    type="text"
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                    placeholder="FC Asobu Academy"
+                  />
+                </div>
 
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                      {org.member_role}
-                    </span>
-                  </div>
-
-                  <p className="mt-3 text-sm text-slate-700">
-                    {org.description || "No description"}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Organization type
+                  </label>
+                  <select
+                    value={orgType}
+                    onChange={(e) => setOrgType(e.target.value as OrganizationRegistrationType)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                  >
+                    {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {ORGANIZATION_REGISTRATION_OPTIONS.find((option) => option.value === orgType)
+                      ?.description || ""}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {org.sport && (
-                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                        {org.sport}
-                      </span>
-                    )}
-                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Main sport
+                  </label>
+                  <select
+                    value={orgSport}
+                    onChange={(e) => setOrgSport(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                  >
+                    <option value="">Choose a sport</option>
+                    {SPORT_REGISTRATION_OPTIONS.map((sport) => (
+                      <option key={sport.value} value={sport.label}>
+                        {sport.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={orgLocation}
+                    onChange={(e) => setOrgLocation(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                    placeholder="Zurich, Switzerland"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Description
+                  </label>
+                  <textarea
+                    value={orgDescription}
+                    onChange={(e) => setOrgDescription(e.target.value)}
+                    className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                    placeholder="Short description"
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={creatingOrg}
+                    className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {creatingOrg ? "Creating..." : "Create organization"}
+                  </button>
+                </div>
+
+                {orgMessage && <p className="text-sm text-slate-600">{orgMessage}</p>}
+              </form>
+            </section>
+
+            <section className="rounded-3xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold text-slate-900">Your organizations</h2>
+                <Link
+                  to="/organizations"
+                  className="text-sm font-medium text-sky-700 hover:text-sky-800"
+                >
+                  Browse all
                 </Link>
-              ))}
-            </div>
-          )}
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {organizations.length > 0 ? (
+                  organizations.map((organization) => (
+                    <Link
+                      key={organization.id}
+                      to={`/organizations/${organization.id}`}
+                      className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      <div>
+                        <h3 className="font-semibold text-slate-900">{organization.name}</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {organization.organization_type} · {organization.member_role}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {organization.location || "No location"}
+                        </p>
+                      </div>
+
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                        {getPrimarySportLabelFromValue(organization.sport)}
+                      </span>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500">You are not part of any organization yet.</p>
+                )}
+              </div>
+            </section>
+          </div>
         </section>
       </div>
     </main>
