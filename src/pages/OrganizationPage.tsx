@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { getFileFromInputEvent, revokeObjectUrl, uploadPostImage, validatePostImageFile } from "../lib/media";
 import ProfileCard from "../components/ProfileCard";
+import ExternalMediaCard from "../components/ExternalMediaCard";
 import {
   formatOrganizationTypeLabel,
   getOrganizationTypeAudienceLabel,
@@ -10,6 +11,8 @@ import {
   normalizeOrganizationType,
   ORGANIZATION_REGISTRATION_OPTIONS,
 } from "../lib/identity";
+import { getExternalMediaPreview } from "../lib/externalMedia";
+import { buildAbsoluteUrl, shareOrCopy } from "../lib/share";
 
 type DbProfile = {
   id: string;
@@ -257,6 +260,8 @@ function OrganizationPage() {
   const canEditOrganization = canManageOrganization;
   const canManageMembers = myMembershipRole === "owner";
   const canSelfLeave = myMembershipRole === "member" || myMembershipRole === "admin";
+
+  const organizationExternalMedia = getExternalMediaPreview(newPost);
 
   const ownershipTransferCandidates = useMemo(
     () =>
@@ -1063,6 +1068,39 @@ function OrganizationPage() {
     setOrgPostImagePreviewUrl("");
   }
 
+  async function handleShareOrganization() {
+    if (!organization) return;
+
+    const result = await shareOrCopy({
+      title: `${organization.name} on Asobu`,
+      text: `${formatOrganizationTypeLabel(organization.organization_type)}${organization.sport ? ` · ${organization.sport}` : ''}\n\nShared from Asobu`,
+      url: buildAbsoluteUrl(`/organizations/${organization.id}`),
+    });
+
+    if (result === "copied") {
+      setPageMessage("Organization link copied.");
+    } else if (result === "shared") {
+      setPageMessage("Organization shared.");
+    }
+  }
+
+  async function handleSharePost(post: Post) {
+    const shareUrl = buildAbsoluteUrl(`/organizations/${organizationId}#post-${post.id}`);
+    const result = await shareOrCopy({
+      title: `${organization?.name || 'Organization'} on Asobu`,
+      text: post.content?.trim()
+        ? `${post.content.trim()}\n\nShared from Asobu`
+        : "Shared from Asobu",
+      url: shareUrl,
+    });
+
+    if (result === "copied") {
+      setPageMessage("Post link copied.");
+    } else if (result === "shared") {
+      setPageMessage("Post shared.");
+    }
+  }
+
   async function handleCreateOrganizationPost() {
     if (!authUserId || !organizationId || (!newPost.trim() && !orgPostImageFile) || !canManageOrganization) {
       return;
@@ -1351,6 +1389,14 @@ function OrganizationPage() {
                     {leavingOrganization ? "Leaving..." : "Leave organization"}
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => void handleShareOrganization()}
+                  className={heroGhostButton}
+                >
+                  Share organization
+                </button>
 
                 <Link to="/organizations" className={heroGhostButton}>
                   All organizations
@@ -1984,7 +2030,7 @@ function OrganizationPage() {
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
-                placeholder="Share a result, announcement, event, or organization update..."
+                placeholder="Share a result, announcement, photo, YouTube link, social link, event, or organization update..."
                 className="mt-4 min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-300"
               />
 
@@ -2009,10 +2055,20 @@ function OrganizationPage() {
                       Remove image
                     </button>
                   )}
+
+                  <span className="ml-auto rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500">
+                    {organizationExternalMedia ? "Media link detected" : "Media ready"}
+                  </span>
                 </div>
 
                 {orgPostImageFile && (
                   <p className="mt-3 text-xs text-slate-500">Selected image: {orgPostImageFile.name}</p>
+                )}
+
+                {organizationExternalMedia && (
+                  <div className="mt-4">
+                    <ExternalMediaCard content={newPost} previewLabel="Detected link preview" />
+                  </div>
                 )}
 
                 {orgPostImagePreviewUrl && (
@@ -2058,8 +2114,9 @@ function OrganizationPage() {
 
                 return (
                   <div
+                    id={`post-${post.id}`}
                     key={post.id}
-                    className="rounded-[28px] border border-slate-200 p-5"
+                    className="rounded-[28px] border border-slate-200 p-5 scroll-mt-24"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
@@ -2107,9 +2164,15 @@ function OrganizationPage() {
                     </div>
 
                     {post.content && (
-                      <p className="mt-4 text-sm leading-7 text-slate-700">
+                      <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-700">
                         {post.content}
                       </p>
+                    )}
+
+                    {getExternalMediaPreview(post.content) && (
+                      <div className="mt-4">
+                        <ExternalMediaCard content={post.content} />
+                      </div>
                     )}
 
                     {post.image_url && (
@@ -2142,7 +2205,10 @@ function OrganizationPage() {
                       <button className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
                         Comment
                       </button>
-                      <button className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
+                      <button
+                        onClick={() => void handleSharePost(post)}
+                        className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                      >
                         Share
                       </button>
                     </div>

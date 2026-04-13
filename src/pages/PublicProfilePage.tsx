@@ -14,6 +14,7 @@ import { mergeSkillEntriesWithTemplate, resolveSkillTemplate, type SkillEntryVal
 import { getPositionLabel } from '../lib/positions';
 import { getPrimarySportLabelFromValue, getSportLabelsFromValue } from '../lib/sports';
 import { supabase } from '../lib/supabase';
+import { buildAbsoluteUrl, shareOrCopy } from '../lib/share';
 
 type Profile = {
   id: string;
@@ -174,6 +175,7 @@ function PublicProfilePage() {
   const [canCurrentUserVote, setCanCurrentUserVote] = useState(false);
   const [pageError, setPageError] = useState('');
   const [validationMessage, setValidationMessage] = useState('');
+  const [shareMessage, setShareMessage] = useState('');
   const [validatingSkillKey, setValidatingSkillKey] = useState<string | null>(null);
 
   const skillTemplate = useMemo(
@@ -439,6 +441,22 @@ function PublicProfilePage() {
     value: skill.communityScore,
   }));
 
+  async function handleShareProfile() {
+    if (!profile) return;
+
+    const result = await shareOrCopy({
+      title: `${profile.full_name || 'Asobu member'} on Asobu`,
+      text: `${headline}\n\nShared from Asobu`,
+      url: buildAbsoluteUrl(`/profiles/${profile.id}`),
+    });
+
+    if (result === 'copied') {
+      setShareMessage('Profile link copied.');
+    } else if (result === 'shared') {
+      setShareMessage('Profile shared.');
+    }
+  }
+
   async function handleSetSkillVote(skillKey: string, voteValue: -1 | 0 | 1) {
     if (!currentUserId || !profile || currentUserId === profile.id || !canCurrentUserVote) return;
 
@@ -571,7 +589,7 @@ function PublicProfilePage() {
               </div>
             </div>
 
-            <div className="flex gap-3 pb-1">
+            <div className="flex flex-wrap gap-3 pb-1">
               {!isOwnProfile && (
                 <Link
                   to={`/messages?with=${profile.id}`}
@@ -580,6 +598,13 @@ function PublicProfilePage() {
                   Message
                 </Link>
               )}
+              <button
+                type="button"
+                onClick={() => void handleShareProfile()}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Share profile
+              </button>
               <Link
                 to="/discover"
                 className="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
@@ -593,6 +618,8 @@ function PublicProfilePage() {
             <h1 className="text-2xl font-bold text-slate-900">{profile.full_name || 'Unnamed user'}</h1>
             <p className="mt-1 text-base text-slate-500">{headline}</p>
           </div>
+
+          {shareMessage && <p className="mt-4 text-sm font-medium text-emerald-600">{shareMessage}</p>}
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             {roles.map((role) => (

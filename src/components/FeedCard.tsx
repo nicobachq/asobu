@@ -1,4 +1,7 @@
-import type { ChangeEvent, Dispatch, SetStateAction } from "react";
+import { useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
+import ExternalMediaCard from "./ExternalMediaCard";
+import { getExternalMediaPreview } from "../lib/externalMedia";
+import { buildAbsoluteUrl, shareOrCopy } from "../lib/share";
 
 type Post = {
   id: number;
@@ -12,6 +15,7 @@ type Post = {
     role: string | null;
   } | null;
   organizations: {
+    id?: number;
     name: string;
     organization_type: string | null;
     logo_url: string | null;
@@ -110,6 +114,8 @@ function FeedCard({
   deletingCommentId,
   currentUserId,
 }: FeedCardProps) {
+  const [shareFeedback, setShareFeedback] = useState("");
+
   const selectedOrganization = selectedPublisher.startsWith("org-")
     ? manageableOrganizations.find(
         (organization) => organization.id === Number(selectedPublisher.replace("org-", ""))
@@ -117,6 +123,28 @@ function FeedCard({
     : null;
 
   const canPublish = Boolean(newPost.trim() || postImagePreviewUrl);
+  const composerExternalMedia = getExternalMediaPreview(newPost);
+
+  async function handleSharePost(post: Post) {
+    const organization = post.organizations;
+    const shareUrl = organization?.id
+      ? buildAbsoluteUrl(`/organizations/${organization.id}#post-${post.id}`)
+      : buildAbsoluteUrl(`/#post-${post.id}`);
+
+    const result = await shareOrCopy({
+      title: `${organization?.name || post.profiles?.full_name || "Asobu member"} on Asobu`,
+      text: post.content?.trim()
+        ? `${post.content.trim()}\n\nShared from Asobu`
+        : "Shared from Asobu",
+      url: shareUrl,
+    });
+
+    if (result === "copied") {
+      setShareFeedback("Post link copied.");
+    } else if (result === "shared") {
+      setShareFeedback("Post shared.");
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -129,7 +157,7 @@ function FeedCard({
               </p>
               <h2 className="mt-2 text-2xl font-bold">Build visibility with every post</h2>
               <p className="mt-2 max-w-2xl text-sm leading-7 text-white/75">
-                Publish as yourself or as one of your organizations. Text and images are now part of your sports identity.
+                Publish as yourself or as one of your organizations. Text, images, and external media links all become part of your sports identity.
               </p>
             </div>
             <div className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur">
@@ -165,7 +193,7 @@ function FeedCard({
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
-                placeholder="Share a result, achievement, photo, transfer update, or community news..."
+                placeholder="Share a result, achievement, photo, YouTube link, social post, transfer update, or community news..."
                 className="min-h-[140px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-300"
               />
             </div>
@@ -214,12 +242,18 @@ function FeedCard({
               )}
 
               <span className="ml-auto rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500">
-                Media ready
+                {composerExternalMedia ? "Media link detected" : "Media ready"}
               </span>
             </div>
 
             {postImageFileName && (
               <p className="mt-3 text-xs text-slate-500">Selected image: {postImageFileName}</p>
+            )}
+
+            {composerExternalMedia && (
+              <div className="mt-4">
+                <ExternalMediaCard content={newPost} previewLabel="Detected link preview" />
+              </div>
             )}
 
             {postImagePreviewUrl && (
@@ -239,7 +273,7 @@ function FeedCard({
                 Identity post
               </span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Media ready
+                Images + links
               </span>
             </div>
 
@@ -251,6 +285,8 @@ function FeedCard({
               {creating ? "Posting..." : "Publish on Asobu"}
             </button>
           </div>
+
+          {shareFeedback && <p className="mt-4 text-sm text-emerald-600">{shareFeedback}</p>}
         </div>
       </section>
 
@@ -272,7 +308,7 @@ function FeedCard({
             : author?.role || "member";
 
           return (
-            <article key={post.id} className="overflow-hidden rounded-[32px] bg-white shadow-sm">
+            <article id={`post-${post.id}`} key={post.id} className="overflow-hidden rounded-[32px] bg-white shadow-sm scroll-mt-24">
               <div className="p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-start gap-4">
@@ -317,7 +353,13 @@ function FeedCard({
                 </div>
 
                 {post.content && (
-                  <p className="mt-5 text-sm leading-7 text-slate-700">{post.content}</p>
+                  <p className="mt-5 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{post.content}</p>
+                )}
+
+                {getExternalMediaPreview(post.content) && (
+                  <div className="mt-5">
+                    <ExternalMediaCard content={post.content} />
+                  </div>
                 )}
               </div>
 
@@ -344,7 +386,10 @@ function FeedCard({
                   <button className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">
                     Comment
                   </button>
-                  <button className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">
+                  <button
+                    onClick={() => void handleSharePost(post)}
+                    className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                  >
                     Share
                   </button>
                 </div>
