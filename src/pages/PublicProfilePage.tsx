@@ -10,7 +10,7 @@ import {
   normalizePersonRole,
   type PersonRole,
 } from '../lib/identity';
-import { mergeSkillEntriesWithTemplate, resolveSkillTemplate, type SkillEntryValue } from '../lib/skills';
+import { mergeSkillEntriesWithTemplate, resolveSkillTemplate, type SkillEntryValue, type SkillValidationSummary } from '../lib/skills';
 import { getPositionLabel } from '../lib/positions';
 import { getPrimarySportLabelFromValue, getSportLabelsFromValue } from '../lib/sports';
 import { supabase } from '../lib/supabase';
@@ -102,11 +102,18 @@ type ProfileSkillEntry = {
   updated_at: string | null;
 };
 
-type ProfileSkillValidation = {
-  id: number;
+type SkillValidationSummaryRow = {
   skill_entry_id: number;
-  validator_user_id: string;
-  created_at: string | null;
+  lower_count: number;
+  fair_count: number;
+  higher_count: number;
+  total_count: number;
+  average_vote: number;
+};
+
+type MySkillVoteRow = {
+  skill_entry_id: number;
+  vote_value: number;
 };
 
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -162,8 +169,9 @@ function PublicProfilePage() {
   const [mediaPosts, setMediaPosts] = useState<MediaPost[]>([]);
   const [historyEntries, setHistoryEntries] = useState<SportingHistoryEntry[]>([]);
   const [skillEntries, setSkillEntries] = useState<ProfileSkillEntry[]>([]);
-  const [skillValidationCounts, setSkillValidationCounts] = useState<Record<string, number>>({});
-  const [myValidatedSkillKeys, setMyValidatedSkillKeys] = useState<string[]>([]);
+  const [skillValidationSummaries, setSkillValidationSummaries] = useState<Record<string, SkillValidationSummary>>({});
+  const [mySkillVotes, setMySkillVotes] = useState<Record<string, number>>({});
+  const [canCurrentUserVote, setCanCurrentUserVote] = useState(false);
   const [pageError, setPageError] = useState('');
   const [validationMessage, setValidationMessage] = useState('');
   const [validatingSkillKey, setValidatingSkillKey] = useState<string | null>(null);
@@ -185,6 +193,27 @@ function PublicProfilePage() {
         data: { user },
       } = await supabase.auth.getUser();
       setCurrentUserId(user?.id ?? null);
+
+      if (user?.id) {
+        const { data: currentRoleRows, error: currentRoleError } = await supabase
+          .from('profile_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .in('role', ['player', 'coach']);
+
+        if (currentRoleError) {
+          const { data: currentProfileRole } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+          setCanCurrentUserVote(['player', 'coach'].includes(currentProfileRole?.role || ''));
+        } else {
+          setCanCurrentUserVote(((currentRoleRows as Array<{ role: string }>) || []).length > 0);
+        }
+      } else {
+        setCanCurrentUserVote(false);
+      }
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -293,56 +322,83 @@ function PublicProfilePage() {
         })));
       }
 
+      const skillTemplateForProfile = resolveSkillTemplate(typedProfile.main_sport);
+
       const { data: skillData, error: skillError } = await supabase
         .from('profile_skill_entries')
         .select('*')
         .eq('user_id', id)
-        .eq('sport', resolveSkillTemplate(typedProfile.main_sport).key)
+        .eq('sport', skillTemplateForProfile.key)
         .order('skill_key', { ascending: true });
 
       if (skillError) {
         console.warn('profile_skill_entries unavailable on public profile:', skillError.message);
         setSkillEntries([]);
-        setSkillValidationCounts({});
-        setMyValidatedSkillKeys([]);
+        setSkillValidationSummaries({});
+        setMySkillVotes({});
       } else {
         const typedSkillEntries = (skillData as ProfileSkillEntry[]) || [];
         setSkillEntries(typedSkillEntries);
 
         if (typedSkillEntries.length > 0) {
-          const { data: validationData, error: validationError } = await supabase
-            .from('profile_skill_validations')
-            .select('id, skill_entry_id, validator_user_id, created_at')
-            .in(
-              'skill_entry_id',
-              typedSkillEntries.map((entry) => entry.id)
-            );
+          const entryMap = new Map(typedSkillEntries.map((entry) => [entry.id, entry.skill_key]));
 
-          if (validationError) {
-            console.warn('profile_skill_validations unavailable on public profile:', validationError.message);
-            setSkillValidationCounts({});
-            setMyValidatedSkillKeys([]);
+          const { data: summaryData, error: summaryError } = await supabase.rpc(
+            'get_skill_validation_summary_for_profile',
+            {
+              p_profile_user_id: id,
+              p_sport: skillTemplateForProfile.key,
+            }
+          );
+
+          if (summaryError) {
+            console.warn('Skill validation summary unavailable on public profile:', summaryError.message);
+            setSkillValidationSummaries({});
           } else {
-            const validations = (validationData as ProfileSkillValidation[]) || [];
-            const entryMap = new Map(typedSkillEntries.map((entry) => [entry.id, entry.skill_key]));
-            const counts: Record<string, number> = {};
-            const validatedByCurrent = new Set<string>();
+            const summaries: Record<string, SkillValidationSummary> = {};
 
-            for (const validation of validations) {
-              const skillKey = entryMap.get(validation.skill_entry_id);
+            for (const row of (summaryData as SkillValidationSummaryRow[]) || []) {
+              const skillKey = entryMap.get(row.skill_entry_id);
               if (!skillKey) continue;
-              counts[skillKey] = (counts[skillKey] || 0) + 1;
-              if (validation.validator_user_id === user?.id) {
-                validatedByCurrent.add(skillKey);
-              }
+              summaries[skillKey] = {
+                lowerCount: row.lower_count || 0,
+                fairCount: row.fair_count || 0,
+                higherCount: row.higher_count || 0,
+                totalCount: row.total_count || 0,
+                averageVote: Number(row.average_vote || 0),
+              };
             }
 
-            setSkillValidationCounts(counts);
-            setMyValidatedSkillKeys(Array.from(validatedByCurrent));
+            setSkillValidationSummaries(summaries);
+          }
+
+          if (user?.id) {
+            const { data: myVoteData, error: myVoteError } = await supabase.rpc(
+              'get_my_skill_validation_votes_for_profile',
+              {
+                p_profile_user_id: id,
+                p_sport: skillTemplateForProfile.key,
+              }
+            );
+
+            if (myVoteError) {
+              console.warn('My skill validation votes unavailable on public profile:', myVoteError.message);
+              setMySkillVotes({});
+            } else {
+              const votes: Record<string, number> = {};
+              for (const row of (myVoteData as MySkillVoteRow[]) || []) {
+                const skillKey = entryMap.get(row.skill_entry_id);
+                if (!skillKey) continue;
+                votes[skillKey] = row.vote_value;
+              }
+              setMySkillVotes(votes);
+            }
+          } else {
+            setMySkillVotes({});
           }
         } else {
-          setSkillValidationCounts({});
-          setMyValidatedSkillKeys([]);
+          setSkillValidationSummaries({});
+          setMySkillVotes({});
         }
       }
 
@@ -372,15 +428,19 @@ function PublicProfilePage() {
   const readinessLabel =
     readinessScore >= 80 ? 'Strong' : readinessScore >= 60 ? 'Good' : 'Early';
   const strongestOrganization = organizations[0] || null;
-  const mergedSkillCards = mergeSkillEntriesWithTemplate(skillTemplate, skillEntries as SkillEntryValue[]);
+  const mergedSkillCards = mergeSkillEntriesWithTemplate(
+    skillTemplate,
+    skillEntries as SkillEntryValue[],
+    skillValidationSummaries
+  );
   const radarPoints = mergedSkillCards.map((skill) => ({
     label: skill.label,
     shortLabel: skill.shortLabel,
-    value: skill.selfRating,
+    value: skill.communityScore,
   }));
 
-  async function handleToggleSkillValidation(skillKey: string) {
-    if (!currentUserId || !profile || currentUserId === profile.id) return;
+  async function handleSetSkillVote(skillKey: string, voteValue: -1 | 0 | 1) {
+    if (!currentUserId || !profile || currentUserId === profile.id || !canCurrentUserVote) return;
 
     const skillEntry = skillEntries.find((entry) => entry.skill_key === skillKey);
     if (!skillEntry) return;
@@ -388,29 +448,11 @@ function PublicProfilePage() {
     setValidatingSkillKey(skillKey);
     setValidationMessage('');
 
-    if (myValidatedSkillKeys.includes(skillKey)) {
-      const { error } = await supabase
-        .from('profile_skill_validations')
-        .delete()
-        .eq('skill_entry_id', skillEntry.id)
-        .eq('validator_user_id', currentUserId);
+    const currentVote = mySkillVotes[skillKey];
 
-      if (error) {
-        setValidationMessage(`Error: ${error.message}`);
-        setValidatingSkillKey(null);
-        return;
-      }
-
-      setMyValidatedSkillKeys((current) => current.filter((item) => item !== skillKey));
-      setSkillValidationCounts((current) => ({
-        ...current,
-        [skillKey]: Math.max((current[skillKey] || 1) - 1, 0),
-      }));
-      setValidationMessage('Validation removed.');
-    } else {
-      const { error } = await supabase.from('profile_skill_validations').insert({
-        skill_entry_id: skillEntry.id,
-        validator_user_id: currentUserId,
+    if (currentVote === voteValue) {
+      const { error } = await supabase.rpc('clear_skill_validation', {
+        p_skill_entry_id: skillEntry.id,
       });
 
       if (error) {
@@ -419,14 +461,63 @@ function PublicProfilePage() {
         return;
       }
 
-      setMyValidatedSkillKeys((current) => [...current, skillKey]);
-      setSkillValidationCounts((current) => ({
-        ...current,
-        [skillKey]: (current[skillKey] || 0) + 1,
-      }));
-      setValidationMessage('Skill validated.');
+      setMySkillVotes((current) => {
+        const next = { ...current };
+        delete next[skillKey];
+        return next;
+      });
+      setSkillValidationSummaries((current) => {
+        const summary = current[skillKey] || { lowerCount: 0, fairCount: 0, higherCount: 0, totalCount: 0, averageVote: 0 };
+        const lowerCount = currentVote === -1 ? Math.max(summary.lowerCount - 1, 0) : summary.lowerCount;
+        const fairCount = currentVote === 0 ? Math.max(summary.fairCount - 1, 0) : summary.fairCount;
+        const higherCount = currentVote === 1 ? Math.max(summary.higherCount - 1, 0) : summary.higherCount;
+        const totalCount = lowerCount + fairCount + higherCount;
+        const averageVote = totalCount > 0 ? ((higherCount - lowerCount) / totalCount) : 0;
+        return {
+          ...current,
+          [skillKey]: { lowerCount, fairCount, higherCount, totalCount, averageVote },
+        };
+      });
+      setValidationMessage('Anonymous vote removed.');
+      setValidatingSkillKey(null);
+      return;
     }
 
+    const { error } = await supabase.rpc('set_skill_validation', {
+      p_skill_entry_id: skillEntry.id,
+      p_vote_value: voteValue,
+    });
+
+    if (error) {
+      setValidationMessage(`Error: ${error.message}`);
+      setValidatingSkillKey(null);
+      return;
+    }
+
+    setMySkillVotes((current) => ({ ...current, [skillKey]: voteValue }));
+    setSkillValidationSummaries((current) => {
+      const summary = current[skillKey] || { lowerCount: 0, fairCount: 0, higherCount: 0, totalCount: 0, averageVote: 0 };
+      let lowerCount = summary.lowerCount;
+      let fairCount = summary.fairCount;
+      let higherCount = summary.higherCount;
+
+      if (currentVote === -1) lowerCount = Math.max(lowerCount - 1, 0);
+      if (currentVote === 0) fairCount = Math.max(fairCount - 1, 0);
+      if (currentVote === 1) higherCount = Math.max(higherCount - 1, 0);
+
+      if (voteValue === -1) lowerCount += 1;
+      if (voteValue === 0) fairCount += 1;
+      if (voteValue === 1) higherCount += 1;
+
+      const totalCount = lowerCount + fairCount + higherCount;
+      const averageVote = totalCount > 0 ? ((higherCount - lowerCount) / totalCount) : 0;
+
+      return {
+        ...current,
+        [skillKey]: { lowerCount, fairCount, higherCount, totalCount, averageVote },
+      };
+    });
+    setValidationMessage('Anonymous skill vote saved.');
     setValidatingSkillKey(null);
   }
 
@@ -751,36 +842,54 @@ function PublicProfilePage() {
 
               <div className="mt-4 space-y-3">
                 {mergedSkillCards.map((skill) => {
-                  const isValidatedByMe = myValidatedSkillKeys.includes(skill.key);
+                  const myVote = mySkillVotes[skill.key] ?? null;
                   return (
                     <div key={skill.key} className="rounded-xl border border-slate-200 p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-medium text-slate-900">{skill.label}</p>
                           <p className="mt-1 text-xs text-slate-500">
-                            Self {skill.selfRating} · {skillValidationCounts[skill.key] || 0} validations
+                            Self {skill.selfRating} · Community {skill.communityScore} · {skill.validationSummary.totalCount} anonymous votes
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            {skill.validationSummary.higherCount} higher · {skill.validationSummary.fairCount} fair · {skill.validationSummary.lowerCount} lower
                           </p>
                         </div>
-                        {!isOwnProfile && (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleSkillValidation(skill.key)}
-                            disabled={validatingSkillKey === skill.key}
-                            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                              isValidatedByMe
-                                ? 'bg-slate-900 text-white hover:bg-slate-800'
-                                : 'bg-sky-50 text-sky-700 hover:bg-sky-100'
-                            } disabled:opacity-60`}
-                          >
-                            {validatingSkillKey === skill.key ? '...' : isValidatedByMe ? 'Validated' : 'Validate'}
-                          </button>
-                        )}
                       </div>
+
+                      {!isOwnProfile && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {([
+                            { label: 'Lower', value: -1 as const },
+                            { label: 'Fair', value: 0 as const },
+                            { label: 'Higher', value: 1 as const },
+                          ]).map((option) => (
+                            <button
+                              key={option.label}
+                              type="button"
+                              onClick={() => handleSetSkillVote(skill.key, option.value)}
+                              disabled={validatingSkillKey === skill.key || !canCurrentUserVote}
+                              className={`rounded-full px-3 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                                myVote === option.value
+                                  ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {validatingSkillKey === skill.key && myVote === option.value ? '...' : option.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
 
+              {!isOwnProfile && (
+                <p className="mt-4 text-xs leading-relaxed text-slate-500">
+                  Anonymous skill votes can currently be submitted only by logged-in players and coaches. Team and match-linked restrictions will become stricter after MVP.
+                </p>
+              )}
               {validationMessage && <p className="mt-4 text-sm text-slate-600">{validationMessage}</p>}
             </div>
 

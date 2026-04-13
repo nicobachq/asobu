@@ -18,6 +18,7 @@ import {
   mergeSkillEntriesWithTemplate,
   resolveSkillTemplate,
   type SkillEntryValue,
+  type SkillValidationSummary,
 } from '../lib/skills';
 import {
   getPositionGroupLabel,
@@ -123,11 +124,13 @@ type ProfileSkillEntry = {
   updated_at: string | null;
 };
 
-type ProfileSkillValidation = {
-  id: number;
+type SkillValidationSummaryRow = {
   skill_entry_id: number;
-  validator_user_id: string;
-  created_at: string | null;
+  lower_count: number;
+  fair_count: number;
+  higher_count: number;
+  total_count: number;
+  average_vote: number;
 };
 
 type RoleSelectionState = Record<PersonRole, boolean>;
@@ -227,7 +230,7 @@ function ProfilePage() {
 
   const [skillEntries, setSkillEntries] = useState<ProfileSkillEntry[]>([]);
   const [skillRatings, setSkillRatings] = useState<Record<string, number>>({});
-  const [skillValidationCounts, setSkillValidationCounts] = useState<Record<string, number>>({});
+  const [skillValidationSummaries, setSkillValidationSummaries] = useState<Record<string, SkillValidationSummary>>({});
   const [skillsAvailable, setSkillsAvailable] = useState(true);
   const [savingSkills, setSavingSkills] = useState(false);
   const [skillMessage, setSkillMessage] = useState('');
@@ -282,8 +285,13 @@ function ProfilePage() {
   );
 
   const mergedSkillCards = useMemo(
-    () => mergeSkillEntriesWithTemplate(activeSkillTemplate, skillEntries as SkillEntryValue[]),
-    [activeSkillTemplate, skillEntries]
+    () =>
+      mergeSkillEntriesWithTemplate(
+        activeSkillTemplate,
+        skillEntries as SkillEntryValue[],
+        skillValidationSummaries
+      ),
+    [activeSkillTemplate, skillEntries, skillValidationSummaries]
   );
 
   const radarPoints = useMemo(
@@ -291,7 +299,7 @@ function ProfilePage() {
       mergedSkillCards.map((skill) => ({
         label: skill.label,
         shortLabel: skill.shortLabel,
-        value: skill.selfRating,
+        value: skill.communityScore,
       })),
     [mergedSkillCards]
   );
@@ -463,7 +471,7 @@ function ProfilePage() {
           buildDefaultSkillRatings(activeSkillTemplate).map((entry) => [entry.skill_key, entry.self_rating])
         )
       );
-      setSkillValidationCounts({});
+      setSkillValidationSummaries({});
       return;
     }
 
@@ -480,35 +488,41 @@ function ProfilePage() {
     );
 
     if (typedEntries.length === 0) {
-      setSkillValidationCounts({});
+      setSkillValidationSummaries({});
       return;
     }
 
-    const { data: validationData, error: validationError } = await supabase
-      .from('profile_skill_validations')
-      .select('id, skill_entry_id, validator_user_id, created_at')
-      .in(
-        'skill_entry_id',
-        typedEntries.map((entry) => entry.id)
-      );
-
-    if (validationError) {
-      console.warn('profile_skill_validations unavailable:', validationError.message);
-      setSkillValidationCounts({});
-      return;
-    }
-
-    const validations = (validationData as ProfileSkillValidation[]) || [];
     const entryMap = new Map(typedEntries.map((entry) => [entry.id, entry.skill_key]));
-    const counts: Record<string, number> = {};
 
-    for (const validation of validations) {
-      const skillKey = entryMap.get(validation.skill_entry_id);
-      if (!skillKey) continue;
-      counts[skillKey] = (counts[skillKey] || 0) + 1;
+    const { data: summaryData, error: summaryError } = await supabase.rpc(
+      'get_skill_validation_summary_for_profile',
+      {
+        p_profile_user_id: userId,
+        p_sport: sportKey,
+      }
+    );
+
+    if (summaryError) {
+      console.warn('Skill validation summary unavailable:', summaryError.message);
+      setSkillValidationSummaries({});
+      return;
     }
 
-    setSkillValidationCounts(counts);
+    const summaries: Record<string, SkillValidationSummary> = {};
+
+    for (const row of (summaryData as SkillValidationSummaryRow[]) || []) {
+      const skillKey = entryMap.get(row.skill_entry_id);
+      if (!skillKey) continue;
+      summaries[skillKey] = {
+        lowerCount: row.lower_count || 0,
+        fairCount: row.fair_count || 0,
+        higherCount: row.higher_count || 0,
+        totalCount: row.total_count || 0,
+        averageVote: Number(row.average_vote || 0),
+      };
+    }
+
+    setSkillValidationSummaries(summaries);
   }
 
   function handleRoleToggle(role: PersonRole) {
@@ -1080,7 +1094,7 @@ function ProfilePage() {
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Skill identity</h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Self-assess your current attributes and build a sports-tech profile layer that will later evolve with validation and match-linked signals.
+                    Set your initial self-assessment, then let anonymous signals from players and coaches gradually shape the public community score.
                   </p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -1110,9 +1124,14 @@ function ProfilePage() {
                               <p className="font-semibold text-slate-900">{skill.label}</p>
                               <p className="mt-1 text-sm leading-7 text-slate-500">{skill.description}</p>
                             </div>
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                              {skill.selfRating}
-                            </span>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                                Self {skill.selfRating}
+                              </span>
+                              <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+                                Community {skill.communityScore}
+                              </span>
+                            </div>
                           </div>
 
                           <input
@@ -1131,8 +1150,11 @@ function ProfilePage() {
 
                           <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                             <span>Self rating</span>
-                            <span>{skillValidationCounts[skill.key] || 0} validations</span>
+                            <span>{skill.validationSummary.totalCount} anonymous votes</span>
                           </div>
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            {skill.validationSummary.higherCount} higher · {skill.validationSummary.fairCount} fair · {skill.validationSummary.lowerCount} lower
+                          </p>
                         </div>
                       ))}
                     </div>
