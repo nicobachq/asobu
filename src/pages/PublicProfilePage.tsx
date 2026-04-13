@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import SkillRadarChart from '../components/SkillRadarChart';
 import {
   formatPersonRoleLabel,
   formatRoleSummary,
@@ -8,9 +9,14 @@ import {
   getUniquePersonRoles,
   normalizePersonRole,
   type PersonRole,
-} from "../lib/identity";
-import { getPrimarySportLabelFromValue, getSportLabelsFromValue } from "../lib/sports";
-import { supabase } from "../lib/supabase";
+} from '../lib/identity';
+import {
+  mergeSkillEntriesWithTemplate,
+  resolveSkillTemplate,
+  type SkillEntryValue,
+} from '../lib/skills';
+import { getPrimarySportLabelFromValue, getSportLabelsFromValue } from '../lib/sports';
+import { supabase } from '../lib/supabase';
 
 type Profile = {
   id: string;
@@ -57,6 +63,39 @@ type MediaPost = {
   created_at: string | null;
 };
 
+type SportingHistoryEntry = {
+  id: number;
+  user_id: string;
+  sport: string | null;
+  organization_name: string;
+  organization_type: string | null;
+  role_label: string | null;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  is_current: boolean;
+  summary: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type ProfileSkillEntry = {
+  id: number;
+  user_id: string;
+  sport: string;
+  skill_key: string;
+  self_rating: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type ProfileSkillValidation = {
+  id: number;
+  skill_entry_id: number;
+  validator_user_id: string;
+  created_at: string | null;
+};
+
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
@@ -65,18 +104,38 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
 function getInitials(name: string) {
   return (
     name
-      .split(" ")
+      .split(' ')
       .filter(Boolean)
       .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() || "")
-      .join("") || "A"
+      .map((part) => part[0]?.toUpperCase() || '')
+      .join('') || 'A'
   );
 }
 
+function formatHistoryPeriod(entry: SportingHistoryEntry) {
+  if (entry.is_current && entry.start_date) {
+    return `${new Date(entry.start_date).toLocaleDateString()} → Present`;
+  }
+
+  if (entry.start_date && entry.end_date) {
+    return `${new Date(entry.start_date).toLocaleDateString()} → ${new Date(entry.end_date).toLocaleDateString()}`;
+  }
+
+  if (entry.start_date) {
+    return `${new Date(entry.start_date).toLocaleDateString()} →`;
+  }
+
+  if (entry.end_date) {
+    return `Until ${new Date(entry.end_date).toLocaleDateString()}`;
+  }
+
+  return 'Period not specified';
+}
+
 const ROLE_DESCRIPTIONS: Record<PersonRole, string> = {
-  player: "Build a visible athlete identity, share media, and be discovered by coaches or scouts.",
-  coach: "Represent technical leadership, player development, and team or organization context.",
-  scout: "Discover talent, follow profiles, and start conversations directly inside Asobu.",
+  player: 'Build a visible athlete identity, share media, and be discovered by coaches or scouts.',
+  coach: 'Represent technical leadership, player development, and team or organization context.',
+  scout: 'Discover talent, follow profiles, and start conversations directly inside Asobu.',
 };
 
 function PublicProfilePage() {
@@ -88,12 +147,23 @@ function PublicProfilePage() {
   const [primaryRole, setPrimaryRole] = useState<PersonRole | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationWithRole[]>([]);
   const [mediaPosts, setMediaPosts] = useState<MediaPost[]>([]);
-  const [pageError, setPageError] = useState("");
+  const [historyEntries, setHistoryEntries] = useState<SportingHistoryEntry[]>([]);
+  const [skillEntries, setSkillEntries] = useState<ProfileSkillEntry[]>([]);
+  const [skillValidationCounts, setSkillValidationCounts] = useState<Record<string, number>>({});
+  const [myValidatedSkillKeys, setMyValidatedSkillKeys] = useState<string[]>([]);
+  const [pageError, setPageError] = useState('');
+  const [validationMessage, setValidationMessage] = useState('');
+  const [validatingSkillKey, setValidatingSkillKey] = useState<string | null>(null);
+
+  const skillTemplate = useMemo(
+    () => resolveSkillTemplate(profile?.main_sport || null),
+    [profile?.main_sport]
+  );
 
   useEffect(() => {
     async function loadPage() {
       if (!id) {
-        setPageError("Profile not found.");
+        setPageError('Profile not found.');
         setLoading(false);
         return;
       }
@@ -104,20 +174,20 @@ function PublicProfilePage() {
       setCurrentUserId(user?.id ?? null);
 
       const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, full_name, role, location, main_sport, created_at")
-        .eq("id", id)
+        .from('profiles')
+        .select('id, full_name, role, location, main_sport, created_at')
+        .eq('id', id)
         .maybeSingle();
 
       if (profileError) {
-        console.error("Error loading public profile:", profileError.message);
+        console.error('Error loading public profile:', profileError.message);
         setPageError(profileError.message);
         setLoading(false);
         return;
       }
 
       if (!profileData) {
-        setPageError("Profile not found.");
+        setPageError('Profile not found.');
         setLoading(false);
         return;
       }
@@ -126,12 +196,12 @@ function PublicProfilePage() {
       setProfile(typedProfile);
 
       const { data: profileRoleData, error: profileRoleError } = await supabase
-        .from("profile_roles")
-        .select("user_id, role, sport, is_primary")
-        .eq("user_id", id);
+        .from('profile_roles')
+        .select('user_id, role, sport, is_primary')
+        .eq('user_id', id);
 
       if (profileRoleError) {
-        console.warn("profile_roles unavailable on public profile, falling back to profile.role");
+        console.warn('profile_roles unavailable on public profile, falling back to profile.role');
         const fallbackRoles = getUniquePersonRoles([typedProfile.role]);
         setRoles(fallbackRoles);
         setPrimaryRole(normalizePersonRole(typedProfile.role) || fallbackRoles[0] || null);
@@ -152,14 +222,14 @@ function PublicProfilePage() {
       }
 
       const { data: membershipData, error: membershipError } = await supabase
-        .from("organization_members")
+        .from('organization_members')
         .select(
-          "id, user_id, member_role, organizations(id, name, organization_type, sport, location, description, logo_url, cover_image_url)"
+          'id, user_id, member_role, organizations(id, name, organization_type, sport, location, description, logo_url, cover_image_url)'
         )
-        .eq("user_id", id);
+        .eq('user_id', id);
 
       if (membershipError) {
-        console.error("Error loading public profile organizations:", membershipError.message);
+        console.error('Error loading public profile organizations:', membershipError.message);
         setOrganizations([]);
       } else {
         const mappedOrganizations: OrganizationWithRole[] =
@@ -169,7 +239,7 @@ function PublicProfilePage() {
               if (!organization) return null;
               return {
                 ...organization,
-                member_role: row.member_role || "member",
+                member_role: row.member_role || 'member',
               };
             })
             .filter(Boolean) as OrganizationWithRole[];
@@ -178,18 +248,85 @@ function PublicProfilePage() {
       }
 
       const { data: mediaData, error: mediaError } = await supabase
-        .from("posts")
-        .select("id, content, image_url, created_at")
-        .eq("user_id", id)
-        .not("image_url", "is", null)
-        .order("created_at", { ascending: false })
+        .from('posts')
+        .select('id, content, image_url, created_at')
+        .eq('user_id', id)
+        .not('image_url', 'is', null)
+        .order('created_at', { ascending: false })
         .limit(6);
 
       if (mediaError) {
-        console.error("Error loading public profile media:", mediaError.message);
+        console.error('Error loading public profile media:', mediaError.message);
         setMediaPosts([]);
       } else {
         setMediaPosts((mediaData as MediaPost[]) || []);
+      }
+
+      const { data: historyData, error: historyError } = await supabase
+        .from('sporting_history_entries')
+        .select('*')
+        .eq('user_id', id)
+        .order('is_current', { ascending: false })
+        .order('start_date', { ascending: false, nullsFirst: false });
+
+      if (historyError) {
+        console.warn('sporting_history_entries unavailable on public profile:', historyError.message);
+        setHistoryEntries([]);
+      } else {
+        setHistoryEntries((historyData as SportingHistoryEntry[]) || []);
+      }
+
+      const { data: skillData, error: skillError } = await supabase
+        .from('profile_skill_entries')
+        .select('*')
+        .eq('user_id', id)
+        .eq('sport', resolveSkillTemplate(typedProfile.main_sport).key)
+        .order('skill_key', { ascending: true });
+
+      if (skillError) {
+        console.warn('profile_skill_entries unavailable on public profile:', skillError.message);
+        setSkillEntries([]);
+        setSkillValidationCounts({});
+        setMyValidatedSkillKeys([]);
+      } else {
+        const typedSkillEntries = (skillData as ProfileSkillEntry[]) || [];
+        setSkillEntries(typedSkillEntries);
+
+        if (typedSkillEntries.length > 0) {
+          const { data: validationData, error: validationError } = await supabase
+            .from('profile_skill_validations')
+            .select('id, skill_entry_id, validator_user_id, created_at')
+            .in(
+              'skill_entry_id',
+              typedSkillEntries.map((entry) => entry.id)
+            );
+
+          if (validationError) {
+            console.warn('profile_skill_validations unavailable on public profile:', validationError.message);
+            setSkillValidationCounts({});
+            setMyValidatedSkillKeys([]);
+          } else {
+            const validations = (validationData as ProfileSkillValidation[]) || [];
+            const entryMap = new Map(typedSkillEntries.map((entry) => [entry.id, entry.skill_key]));
+            const counts: Record<string, number> = {};
+            const validatedByCurrent = new Set<string>();
+
+            for (const validation of validations) {
+              const skillKey = entryMap.get(validation.skill_entry_id);
+              if (!skillKey) continue;
+              counts[skillKey] = (counts[skillKey] || 0) + 1;
+              if (validation.validator_user_id === user?.id) {
+                validatedByCurrent.add(skillKey);
+              }
+            }
+
+            setSkillValidationCounts(counts);
+            setMyValidatedSkillKeys(Array.from(validatedByCurrent));
+          }
+        } else {
+          setSkillValidationCounts({});
+          setMyValidatedSkillKeys([]);
+        }
       }
 
       setLoading(false);
@@ -202,6 +339,102 @@ function PublicProfilePage() {
     () => getSportLabelsFromValue(profile?.main_sport || null),
     [profile?.main_sport]
   );
+
+  const headline = formatRoleSummary(roles, primaryRole);
+  const identityContext = getIdentityContextLabel(roles, primaryRole);
+  const openToLabels = getOpenToLabelsForRoles(roles);
+  const isOwnProfile = currentUserId === profile?.id;
+  const readinessChecks = [
+    Boolean(profile?.full_name?.trim()),
+    Boolean(profile?.location?.trim()),
+    sportLabels.length > 0,
+    roles.length > 0,
+    organizations.length > 0,
+    historyEntries.length > 0,
+    skillEntries.length > 0,
+  ];
+  const readinessScore = profile
+    ? Math.round((readinessChecks.filter(Boolean).length / readinessChecks.length) * 100)
+    : 0;
+  const readinessLabel =
+    readinessScore >= 85 ? 'Strong' : readinessScore >= 65 ? 'Good' : 'Early';
+  const strongestOrganization = organizations[0] || null;
+
+  const mergedSkillCards = useMemo(
+    () => mergeSkillEntriesWithTemplate(skillTemplate, skillEntries as SkillEntryValue[]),
+    [skillTemplate, skillEntries]
+  );
+
+  const radarPoints = useMemo(
+    () =>
+      mergedSkillCards.map((skill) => ({
+        label: skill.label,
+        shortLabel: skill.shortLabel,
+        value: skill.selfRating,
+      })),
+    [mergedSkillCards]
+  );
+
+  const topValidatedSkills = useMemo(
+    () =>
+      [...mergedSkillCards]
+        .sort((a, b) => (skillValidationCounts[b.key] || 0) - (skillValidationCounts[a.key] || 0))
+        .slice(0, 4),
+    [mergedSkillCards, skillValidationCounts]
+  );
+
+  async function handleToggleValidation(skillKey: string) {
+    if (!currentUserId || !profile || isOwnProfile) return;
+
+    const entry = skillEntries.find((item) => item.skill_key === skillKey);
+    if (!entry) return;
+
+    setValidatingSkillKey(skillKey);
+    setValidationMessage('');
+
+    const alreadyValidated = myValidatedSkillKeys.includes(skillKey);
+
+    if (alreadyValidated) {
+      const { error } = await supabase
+        .from('profile_skill_validations')
+        .delete()
+        .eq('skill_entry_id', entry.id)
+        .eq('validator_user_id', currentUserId);
+
+      if (error) {
+        setValidationMessage(`Error: ${error.message}`);
+        setValidatingSkillKey(null);
+        return;
+      }
+
+      setMyValidatedSkillKeys((current) => current.filter((item) => item !== skillKey));
+      setSkillValidationCounts((current) => ({
+        ...current,
+        [skillKey]: Math.max((current[skillKey] || 1) - 1, 0),
+      }));
+      setValidationMessage('Validation removed.');
+    } else {
+      const { error } = await supabase.from('profile_skill_validations').insert({
+        skill_entry_id: entry.id,
+        validator_user_id: currentUserId,
+      });
+
+      if (error) {
+        setValidationMessage(`Error: ${error.message}`);
+        setValidatingSkillKey(null);
+        return;
+      }
+
+      setMyValidatedSkillKeys((current) => [...current, skillKey]);
+      setSkillValidationCounts((current) => ({
+        ...current,
+        [skillKey]: (current[skillKey] || 0) + 1,
+      }));
+      setValidationMessage('Skill validated.');
+    }
+
+    setValidatingSkillKey(null);
+  }
 
   if (loading) {
     return (
@@ -225,7 +458,7 @@ function PublicProfilePage() {
           <p className="mt-3 text-slate-500">{pageError || "This profile doesn't exist."}</p>
           <Link
             to="/discover"
-            className="mt-8 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
+            className="mt-8 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800"
           >
             Back to discover
           </Link>
@@ -234,44 +467,25 @@ function PublicProfilePage() {
     );
   }
 
-  const isOwnProfile = currentUserId === profile.id;
-  const headline = formatRoleSummary(roles, primaryRole);
-  const identityContext = getIdentityContextLabel(roles, primaryRole);
-  const openToLabels = getOpenToLabelsForRoles(roles);
-  const readinessChecks = [
-    Boolean(profile.full_name?.trim()),
-    Boolean(profile.location?.trim()),
-    sportLabels.length > 0,
-    roles.length > 0,
-    organizations.length > 0,
-  ];
-  const readinessScore = readinessChecks.filter(Boolean).length * 20;
-  const readinessLabel =
-    readinessScore >= 80 ? "Strong" : readinessScore >= 60 ? "Good" : "Early";
-  const strongestOrganization = organizations[0] || null;
-
   return (
     <main className="min-h-screen bg-slate-50/80">
-      {/* ───── HERO ───── */}
       <div className="relative">
         <div className="h-56 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 sm:h-64 lg:h-72" />
 
         <div className="mx-auto max-w-5xl px-6">
           <div className="relative -mt-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-            {/* Avatar + Name */}
             <div className="flex items-end gap-5">
               <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-lg sm:h-32 sm:w-32">
-                {getInitials(profile.full_name || "Asobu User")}
+                {getInitials(profile.full_name || 'Asobu User')}
               </div>
-              <div className="pb-1 hidden sm:block">
+              <div className="hidden pb-1 sm:block">
                 <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">
-                  {profile.full_name || "Unnamed user"}
+                  {profile.full_name || 'Unnamed user'}
                 </h1>
                 <p className="mt-1 text-base text-slate-500">{headline}</p>
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex gap-3 pb-1">
               {isOwnProfile ? (
                 <Link
@@ -297,23 +511,17 @@ function PublicProfilePage() {
             </div>
           </div>
 
-          {/* Mobile name (below avatar) */}
           <div className="mt-4 sm:hidden">
-            <h1 className="text-2xl font-bold text-slate-900">
-              {profile.full_name || "Unnamed user"}
-            </h1>
+            <h1 className="text-2xl font-bold text-slate-900">{profile.full_name || 'Unnamed user'}</h1>
             <p className="mt-1 text-base text-slate-500">{headline}</p>
           </div>
 
-          {/* Tags row */}
           <div className="mt-5 flex flex-wrap items-center gap-2">
             {roles.map((role) => (
               <span
                 key={role}
-                className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide uppercase ${
-                  role === primaryRole
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-600"
+                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+                  role === primaryRole ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                 }`}
               >
                 {formatPersonRoleLabel(role)}
@@ -322,62 +530,50 @@ function PublicProfilePage() {
             {sportLabels.map((sport) => (
               <span
                 key={sport}
-                className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold tracking-wide uppercase text-sky-700"
+                className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-700"
               >
                 {sport}
               </span>
             ))}
-            {profile.location && (
-              <span className="text-xs text-slate-400">
-                ·&nbsp;&nbsp;{profile.location}
-              </span>
-            )}
+            {profile.location && <span className="text-xs text-slate-400">·&nbsp;&nbsp;{profile.location}</span>}
           </div>
         </div>
       </div>
 
-      {/* ───── BODY ───── */}
       <div className="mx-auto max-w-5xl px-6 pb-20">
-        {/* ── MEDIA (hero position — most prominent) ── */}
         <section className="mt-10">
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Media</h2>
             <span className="text-xs font-medium text-slate-400">
-              {mediaPosts.length} {mediaPosts.length === 1 ? "post" : "posts"}
+              {mediaPosts.length} {mediaPosts.length === 1 ? 'post' : 'posts'}
             </span>
           </div>
 
           {mediaPosts.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
-              <p className="text-sm text-slate-400">
-                No media yet — posts with images will appear here.
-              </p>
+              <p className="text-sm text-slate-400">No media yet — posts with images will appear here.</p>
             </div>
           ) : (
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {mediaPosts.map((post, i) => (
+              {mediaPosts.map((post, index) => (
                 <div
                   key={post.id}
-                  className={`group relative overflow-hidden rounded-2xl bg-slate-200 ${
-                    i === 0 ? "col-span-2 row-span-2" : ""
-                  }`}
+                  className={`group relative overflow-hidden rounded-2xl bg-slate-200 ${index === 0 ? 'col-span-2 row-span-2' : ''}`}
                 >
                   {post.image_url && (
                     <img
                       src={post.image_url}
-                      alt={post.content || `${profile.full_name || "Asobu member"} media`}
+                      alt={post.content || `${profile.full_name || 'Asobu member'} media`}
                       className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${
-                        i === 0 ? "h-72 sm:h-96" : "h-44 sm:h-52"
+                        index === 0 ? 'h-72 sm:h-96' : 'h-44 sm:h-52'
                       }`}
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                  <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
-                    <p className="text-xs font-medium text-white line-clamp-2">
-                      {post.content || "Image post"}
-                    </p>
+                  <div className="absolute bottom-0 left-0 right-0 translate-y-2 p-3 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                    <p className="line-clamp-2 text-xs font-medium text-white">{post.content || 'Image post'}</p>
                     <p className="mt-0.5 text-[10px] text-white/70">
-                      {post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recently"}
+                      {post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Recently'}
                     </p>
                   </div>
                 </div>
@@ -386,13 +582,88 @@ function PublicProfilePage() {
           )}
         </section>
 
-        {/* ── SNAPSHOT ROW ── */}
+        <section className="mt-12">
+          <div className="flex items-baseline justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Skill identity</h2>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                {skillTemplate.intro}
+              </p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+              {skillTemplate.label}
+            </span>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <SkillRadarChart title={`${skillTemplate.sportLabel} skill map`} points={radarPoints} />
+
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <p className="text-sm font-semibold text-slate-900">Validation pulse</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  Self ratings shape the graph. The network can validate specific skills to reinforce credibility.
+                </p>
+                <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
+                  {skillTemplate.validationLabel}
+                </p>
+                {validationMessage && <p className="mt-3 text-sm text-slate-600">{validationMessage}</p>}
+              </div>
+
+              {topValidatedSkills.map((skill) => {
+                const isValidated = myValidatedSkillKeys.includes(skill.key);
+                const validationCount = skillValidationCounts[skill.key] || 0;
+
+                return (
+                  <div key={skill.key} className="rounded-2xl bg-white p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-900">{skill.label}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
+                          {skill.shortLabel}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-slate-900">{skill.selfRating}</p>
+                        <p className="text-xs text-slate-500">
+                          {validationCount} validation{validationCount === 1 ? '' : 's'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="mt-3 text-sm leading-7 text-slate-600">{skill.description}</p>
+
+                    {!isOwnProfile && currentUserId && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleValidation(skill.key)}
+                        disabled={validatingSkillKey === skill.key}
+                        className={`mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${
+                          isValidated
+                            ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                            : 'bg-slate-900 text-white hover:bg-slate-800'
+                        } ${validatingSkillKey === skill.key ? 'opacity-60' : ''}`}
+                      >
+                        {validatingSkillKey === skill.key
+                          ? 'Saving...'
+                          : isValidated
+                          ? 'Remove validation'
+                          : `Validate ${skill.label}`}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
         <section className="mt-12">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Primary role</p>
               <p className="mt-2 text-lg font-bold text-slate-900">
-                {primaryRole ? formatPersonRoleLabel(primaryRole) : "—"}
+                {primaryRole ? formatPersonRoleLabel(primaryRole) : '—'}
               </p>
             </div>
             <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -404,7 +675,7 @@ function PublicProfilePage() {
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Organizations</p>
               <p className="mt-2 text-lg font-bold text-slate-900">
-                {organizations.length > 0 ? organizations.length : "—"}
+                {organizations.length > 0 ? organizations.length : '—'}
               </p>
             </div>
             <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -415,18 +686,18 @@ function PublicProfilePage() {
           </div>
         </section>
 
-        {/* ── TWO-COLUMN: LEFT content / RIGHT sidebar ── */}
         <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_300px]">
-          {/* LEFT */}
           <div className="space-y-10">
-            {/* About */}
             <section>
               <h2 className="text-lg font-semibold text-slate-900">About</h2>
               <p className="mt-3 text-sm leading-relaxed text-slate-600">{identityContext}</p>
               {openToLabels.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {openToLabels.map((item) => (
-                    <span key={item} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                    <span
+                      key={item}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
+                    >
                       {item}
                     </span>
                   ))}
@@ -434,24 +705,20 @@ function PublicProfilePage() {
               )}
             </section>
 
-            {/* Roles */}
             <section>
               <h2 className="text-lg font-semibold text-slate-900">Roles</h2>
               {roles.length > 0 ? (
                 <div className="mt-4 space-y-3">
                   {roles.map((role) => (
-                    <div
-                      key={role}
-                      className="flex items-start gap-4 rounded-2xl bg-white p-5 shadow-sm"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-600 uppercase">
+                    <div key={role} className="flex items-start gap-4 rounded-2xl bg-white p-5 shadow-sm">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold uppercase text-slate-600">
                         {role[0]}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-slate-900">{formatPersonRoleLabel(role)}</p>
                           {role === primaryRole && (
-                            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white uppercase tracking-wider">
+                            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
                               Primary
                             </span>
                           )}
@@ -466,7 +733,6 @@ function PublicProfilePage() {
               )}
             </section>
 
-            {/* Organizations */}
             <section>
               <h2 className="text-lg font-semibold text-slate-900">Organizations</h2>
               {organizations.length > 0 ? (
@@ -477,7 +743,7 @@ function PublicProfilePage() {
                       to={`/organizations/${org.id}`}
                       className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-white overflow-hidden">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-white">
                         {org.logo_url ? (
                           <img src={org.logo_url} alt={org.name} className="h-full w-full object-contain p-1" />
                         ) : (
@@ -488,12 +754,12 @@ function PublicProfilePage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-slate-900">{org.name}</p>
-                        <p className="mt-0.5 text-xs text-slate-400 capitalize">
-                          {org.organization_type || "Organization"} · {org.member_role}
-                          {org.location ? ` · ${org.location}` : ""}
+                        <p className="mt-0.5 text-xs capitalize text-slate-400">
+                          {org.organization_type || 'Organization'} · {org.member_role}
+                          {org.location ? ` · ${org.location}` : ''}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold text-sky-700 uppercase tracking-wider">
+                      <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-sky-700">
                         {getPrimarySportLabelFromValue(org.sport)}
                       </span>
                     </Link>
@@ -504,28 +770,57 @@ function PublicProfilePage() {
               )}
             </section>
 
-            {/* Sporting History */}
             <section>
-              <h2 className="text-lg font-semibold text-slate-900">Sporting history</h2>
-              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
-                <p className="text-sm text-slate-400">
-                  Timeline of teams, milestones, and development stages — coming soon.
-                </p>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-slate-900">Sporting history</h2>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  {historyEntries.length} phases
+                </span>
               </div>
+              {historyEntries.length > 0 ? (
+                <div className="mt-4 space-y-4">
+                  {historyEntries.map((entry) => (
+                    <div key={entry.id} className="relative rounded-2xl bg-white p-5 shadow-sm">
+                      <div className="absolute bottom-5 left-6 top-5 w-px bg-slate-200" />
+                      <div className="relative pl-8">
+                        <div className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-slate-900" />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-900">{entry.organization_name}</p>
+                          {entry.is_current && (
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                              Current
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {(entry.role_label || 'Role not specified') + ' · ' + (entry.location || 'No location')}
+                        </p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
+                          {formatHistoryPeriod(entry)}
+                        </p>
+                        {entry.summary && <p className="mt-3 text-sm leading-7 text-slate-600">{entry.summary}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
+                  <p className="text-sm text-slate-400">
+                    Timeline of teams, phases, and development milestones will appear here.
+                  </p>
+                </div>
+              )}
             </section>
           </div>
 
-          {/* RIGHT SIDEBAR */}
           <div className="space-y-6">
-            {/* Achievements */}
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900">Achievements</h3>
               <div className="mt-3 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
-                <p className="text-xs text-slate-400">Badges and recognition will appear here.</p>
+                <p className="text-xs text-slate-400">Badges, milestones, and recognition will appear here.</p>
               </div>
             </div>
 
-            {/* Strongest affiliation */}
             {strongestOrganization && (
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-slate-900">Primary affiliation</h3>
@@ -535,13 +830,12 @@ function PublicProfilePage() {
               </div>
             )}
 
-            {/* CTA */}
             <div className="rounded-2xl bg-slate-900 p-5 text-white">
               <h3 className="text-sm font-semibold">Connect on Asobu</h3>
               <p className="mt-2 text-xs leading-relaxed text-slate-300">
                 {isOwnProfile
-                  ? "This is your public profile — keep shaping it to attract opportunities."
-                  : "Interested? Start a conversation directly on the platform."}
+                  ? 'This is your public profile — keep shaping it to attract opportunities.'
+                  : 'Interested? Start a conversation directly on the platform.'}
               </p>
               {!isOwnProfile && (
                 <Link
