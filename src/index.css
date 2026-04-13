@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: rgb(241 245 249);
+  color: rgb(15 23 42);
+}
+
 @layer utilities {
   .no-scrollbar {
     -ms-overflow-style: none;

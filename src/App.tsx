@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import Navbar from "./components/Navbar";
 import FeedPage from "./pages/FeedPage";
@@ -8,6 +8,7 @@ import ProfilePage from "./pages/ProfilePage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import MessagesPage from "./pages/MessagesPage";
 import AuthPage from "./pages/AuthPage";
+import LandingPage from "./pages/LandingPage";
 import OrganizationPage from "./pages/OrganizationPage";
 import OrganizationsListPage from "./pages/OrganizationsListPage";
 import { normalizePersonRole } from "./lib/identity";
@@ -140,7 +141,13 @@ function App() {
   }
 
   if (!session) {
-    return <AuthPage />;
+    return (
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   }
 
   return (
@@ -156,6 +163,8 @@ function App() {
         <Route path="/messages/:conversationId" element={<MessagesPage />} />
         <Route path="/organizations" element={<OrganizationsListPage />} />
         <Route path="/organizations/:id" element={<OrganizationPage />} />
+        <Route path="/auth" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
