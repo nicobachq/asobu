@@ -4,66 +4,66 @@ export type SportOption = {
 };
 
 export const DISCOVER_SPORT_OPTIONS: SportOption[] = [
-  { value: "all", label: "All sports" },
-  { value: "football", label: "Football" },
-  { value: "futsal", label: "Futsal" },
-  { value: "basketball", label: "Basketball" },
-  { value: "volleyball", label: "Volleyball" },
-  { value: "tennis", label: "Tennis" },
-  { value: "padel", label: "Padel" },
-  { value: "handball", label: "Handball" },
-  { value: "rugby", label: "Rugby" },
-  { value: "athletics", label: "Athletics" },
-  { value: "swimming", label: "Swimming" },
-  { value: "cycling", label: "Cycling" },
-  { value: "martial-arts", label: "Martial Arts" },
-  { value: "gymnastics", label: "Gymnastics" },
-  { value: "winter-sports", label: "Ski / Winter Sports" },
-  { value: "motorsport", label: "Motorsport" },
-  { value: "other", label: "Other" },
+  { value: 'all', label: 'All sports' },
+  { value: 'football', label: 'Football' },
+  { value: 'futsal', label: 'Futsal' },
+  { value: 'basketball', label: 'Basketball' },
+  { value: 'volleyball', label: 'Volleyball' },
+  { value: 'rugby', label: 'Rugby' },
+  { value: 'tennis', label: 'Tennis' },
+  { value: 'padel', label: 'Padel' },
+  { value: 'floorball', label: 'Unihockey / Floorball' },
+  { value: 'ice-hockey', label: 'Ice Hockey' },
+  { value: 'field-hockey', label: 'Field Hockey' },
+  { value: 'roller-hockey', label: 'Roller Hockey' },
+  { value: 'handball', label: 'Handball' },
+  { value: 'athletics', label: 'Athletics' },
+  { value: 'swimming', label: 'Swimming' },
+  { value: 'cycling', label: 'Cycling' },
+  { value: 'martial-arts', label: 'Martial Arts' },
+  { value: 'gymnastics', label: 'Gymnastics' },
+  { value: 'winter-sports', label: 'Ski / Winter Sports' },
+  { value: 'motorsport', label: 'Motorsport' },
+  { value: 'other', label: 'Other' },
 ];
 
 export const SPORT_REGISTRATION_OPTIONS: SportOption[] = DISCOVER_SPORT_OPTIONS.filter(
-  (option) => option.value !== "all"
+  (option) => option.value !== 'all'
 );
 
 const SPORT_ALIASES: Record<string, string[]> = {
-  football: ["football", "soccer", "calcio", "futbol", "fútbol"],
-  futsal: ["futsal", "5-a-side", "five-a-side", "indoor football"],
-  basketball: ["basketball"],
-  volleyball: ["volleyball", "beach volleyball", "volley"],
-  tennis: ["tennis"],
-  padel: ["padel", "paddle"],
-  handball: ["handball"],
-  rugby: ["rugby"],
-  athletics: ["athletics", "track and field", "track & field", "running"],
-  swimming: ["swimming"],
-  cycling: ["cycling", "biking", "road cycling", "mtb", "mountain bike"],
-  "martial-arts": [
-    "martial arts",
-    "mma",
-    "boxing",
-    "judo",
-    "karate",
-    "taekwondo",
-    "wrestling",
-    "kickboxing",
-    "muay thai",
-    "bjj",
-    "jiu jitsu",
-    "jiu-jitsu",
+  football: ['football', 'soccer', 'calcio', 'futbol', 'fútbol'],
+  futsal: ['futsal', '5-a-side', 'five-a-side', 'indoor football'],
+  basketball: ['basketball'],
+  volleyball: ['volleyball', 'beach volleyball', 'volley'],
+  rugby: ['rugby'],
+  tennis: ['tennis'],
+  padel: ['padel', 'paddle'],
+  floorball: ['floorball', 'unihockey', 'unihoc', 'uni hockey'],
+  'ice-hockey': ['ice hockey', 'hockey on ice'],
+  'field-hockey': ['field hockey'],
+  'roller-hockey': ['roller hockey', 'rink hockey', 'inline hockey', 'quad hockey'],
+  handball: ['handball'],
+  athletics: ['athletics', 'track and field', 'track & field', 'running'],
+  swimming: ['swimming'],
+  cycling: ['cycling', 'biking', 'road cycling', 'mtb', 'mountain bike'],
+  'martial-arts': [
+    'martial arts',
+    'mma',
+    'boxing',
+    'judo',
+    'karate',
+    'taekwondo',
+    'wrestling',
+    'kickboxing',
+    'muay thai',
+    'bjj',
+    'jiu jitsu',
+    'jiu-jitsu',
   ],
-  gymnastics: ["gymnastics"],
-  "winter-sports": [
-    "ski",
-    "skiing",
-    "snowboard",
-    "snowboarding",
-    "ice hockey",
-    "figure skating",
-    "winter sports",
-  ],
-  motorsport: ["motorsport", "motocross", "karting", "formula", "rally"],
+  gymnastics: ['gymnastics'],
+  'winter-sports': ['ski', 'skiing', 'snowboard', 'snowboarding', 'figure skating', 'winter sports'],
+  motorsport: ['motorsport', 'motocross', 'karting', 'formula', 'rally'],
 };
 
 const SPORT_LABEL_BY_VALUE = DISCOVER_SPORT_OPTIONS.reduce((acc, option) => {
@@ -72,7 +72,7 @@ const SPORT_LABEL_BY_VALUE = DISCOVER_SPORT_OPTIONS.reduce((acc, option) => {
 }, {} as Record<string, string>);
 
 function normalizePiece(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 function findCanonicalSport(rawValue: string): string | null {
@@ -85,7 +85,7 @@ function findCanonicalSport(rawValue: string): string | null {
     }
   }
 
-  return "other";
+  return 'other';
 }
 
 export function getNormalizedSportsFromValue(value: string | null | undefined): string[] {
@@ -111,10 +111,10 @@ export function getNormalizedSportsFromValue(value: string | null | undefined): 
 
 export function getSportLabelsFromValue(value: string | null | undefined): string[] {
   return getNormalizedSportsFromValue(value).map(
-    (sportValue) => SPORT_LABEL_BY_VALUE[sportValue] || "Other"
+    (sportValue) => SPORT_LABEL_BY_VALUE[sportValue] || 'Other'
   );
 }
 
 export function getPrimarySportLabelFromValue(value: string | null | undefined) {
-  return getSportLabelsFromValue(value)[0] || "Not specified";
+  return getSportLabelsFromValue(value)[0] || 'Not specified';
 }

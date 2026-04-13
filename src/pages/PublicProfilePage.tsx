@@ -10,11 +10,8 @@ import {
   normalizePersonRole,
   type PersonRole,
 } from '../lib/identity';
-import {
-  mergeSkillEntriesWithTemplate,
-  resolveSkillTemplate,
-  type SkillEntryValue,
-} from '../lib/skills';
+import { mergeSkillEntriesWithTemplate, resolveSkillTemplate, type SkillEntryValue } from '../lib/skills';
+import { getPositionLabel } from '../lib/positions';
 import { getPrimarySportLabelFromValue, getSportLabelsFromValue } from '../lib/sports';
 import { supabase } from '../lib/supabase';
 
@@ -63,12 +60,23 @@ type MediaPost = {
   created_at: string | null;
 };
 
-type SportingHistoryEntry = {
+type HistoryOrganizationRef = {
+  id: number;
+  name: string;
+  organization_type: string | null;
+  sport: string | null;
+  location: string | null;
+  logo_url?: string | null;
+};
+
+type SportingHistoryRow = {
   id: number;
   user_id: string;
   sport: string | null;
+  organization_id: number | null;
   organization_name: string;
   organization_type: string | null;
+  position_key: string | null;
   role_label: string | null;
   location: string | null;
   start_date: string | null;
@@ -77,6 +85,11 @@ type SportingHistoryEntry = {
   summary: string | null;
   created_at: string | null;
   updated_at: string | null;
+  organizations: HistoryOrganizationRef | HistoryOrganizationRef[] | null;
+};
+
+type SportingHistoryEntry = SportingHistoryRow & {
+  organizations: HistoryOrganizationRef | null;
 };
 
 type ProfileSkillEntry = {
@@ -232,17 +245,16 @@ function PublicProfilePage() {
         console.error('Error loading public profile organizations:', membershipError.message);
         setOrganizations([]);
       } else {
-        const mappedOrganizations: OrganizationWithRole[] =
-          ((membershipData as OrganizationMembershipRow[]) || [])
-            .map((row) => {
-              const organization = firstRelation(row.organizations);
-              if (!organization) return null;
-              return {
-                ...organization,
-                member_role: row.member_role || 'member',
-              };
-            })
-            .filter(Boolean) as OrganizationWithRole[];
+        const mappedOrganizations: OrganizationWithRole[] = ((membershipData as OrganizationMembershipRow[]) || [])
+          .map((row) => {
+            const organization = firstRelation(row.organizations);
+            if (!organization) return null;
+            return {
+              ...organization,
+              member_role: row.member_role || 'member',
+            };
+          })
+          .filter(Boolean) as OrganizationWithRole[];
 
         setOrganizations(mappedOrganizations);
       }
@@ -264,7 +276,9 @@ function PublicProfilePage() {
 
       const { data: historyData, error: historyError } = await supabase
         .from('sporting_history_entries')
-        .select('*')
+        .select(
+          'id, user_id, sport, organization_id, organization_name, organization_type, position_key, role_label, location, start_date, end_date, is_current, summary, created_at, updated_at, organizations(id, name, organization_type, sport, location, logo_url)'
+        )
         .eq('user_id', id)
         .order('is_current', { ascending: false })
         .order('start_date', { ascending: false, nullsFirst: false });
@@ -273,7 +287,10 @@ function PublicProfilePage() {
         console.warn('sporting_history_entries unavailable on public profile:', historyError.message);
         setHistoryEntries([]);
       } else {
-        setHistoryEntries((historyData as SportingHistoryEntry[]) || []);
+        setHistoryEntries(((historyData as SportingHistoryRow[]) || []).map((entry) => ({
+          ...entry,
+          organizations: firstRelation(entry.organizations),
+        })));
       }
 
       const { data: skillData, error: skillError } = await supabase
@@ -343,7 +360,6 @@ function PublicProfilePage() {
   const headline = formatRoleSummary(roles, primaryRole);
   const identityContext = getIdentityContextLabel(roles, primaryRole);
   const openToLabels = getOpenToLabelsForRoles(roles);
-  const isOwnProfile = currentUserId === profile?.id;
   const readinessChecks = [
     Boolean(profile?.full_name?.trim()),
     Boolean(profile?.location?.trim()),
@@ -351,54 +367,32 @@ function PublicProfilePage() {
     roles.length > 0,
     organizations.length > 0,
     historyEntries.length > 0,
-    skillEntries.length > 0,
   ];
-  const readinessScore = profile
-    ? Math.round((readinessChecks.filter(Boolean).length / readinessChecks.length) * 100)
-    : 0;
+  const readinessScore = readinessChecks.filter(Boolean).length * Math.round(100 / readinessChecks.length);
   const readinessLabel =
-    readinessScore >= 85 ? 'Strong' : readinessScore >= 65 ? 'Good' : 'Early';
+    readinessScore >= 80 ? 'Strong' : readinessScore >= 60 ? 'Good' : 'Early';
   const strongestOrganization = organizations[0] || null;
+  const mergedSkillCards = mergeSkillEntriesWithTemplate(skillTemplate, skillEntries as SkillEntryValue[]);
+  const radarPoints = mergedSkillCards.map((skill) => ({
+    label: skill.label,
+    shortLabel: skill.shortLabel,
+    value: skill.selfRating,
+  }));
 
-  const mergedSkillCards = useMemo(
-    () => mergeSkillEntriesWithTemplate(skillTemplate, skillEntries as SkillEntryValue[]),
-    [skillTemplate, skillEntries]
-  );
+  async function handleToggleSkillValidation(skillKey: string) {
+    if (!currentUserId || !profile || currentUserId === profile.id) return;
 
-  const radarPoints = useMemo(
-    () =>
-      mergedSkillCards.map((skill) => ({
-        label: skill.label,
-        shortLabel: skill.shortLabel,
-        value: skill.selfRating,
-      })),
-    [mergedSkillCards]
-  );
-
-  const topValidatedSkills = useMemo(
-    () =>
-      [...mergedSkillCards]
-        .sort((a, b) => (skillValidationCounts[b.key] || 0) - (skillValidationCounts[a.key] || 0))
-        .slice(0, 4),
-    [mergedSkillCards, skillValidationCounts]
-  );
-
-  async function handleToggleValidation(skillKey: string) {
-    if (!currentUserId || !profile || isOwnProfile) return;
-
-    const entry = skillEntries.find((item) => item.skill_key === skillKey);
-    if (!entry) return;
+    const skillEntry = skillEntries.find((entry) => entry.skill_key === skillKey);
+    if (!skillEntry) return;
 
     setValidatingSkillKey(skillKey);
     setValidationMessage('');
 
-    const alreadyValidated = myValidatedSkillKeys.includes(skillKey);
-
-    if (alreadyValidated) {
+    if (myValidatedSkillKeys.includes(skillKey)) {
       const { error } = await supabase
         .from('profile_skill_validations')
         .delete()
-        .eq('skill_entry_id', entry.id)
+        .eq('skill_entry_id', skillEntry.id)
         .eq('validator_user_id', currentUserId);
 
       if (error) {
@@ -415,7 +409,7 @@ function PublicProfilePage() {
       setValidationMessage('Validation removed.');
     } else {
       const { error } = await supabase.from('profile_skill_validations').insert({
-        skill_entry_id: entry.id,
+        skill_entry_id: skillEntry.id,
         validator_user_id: currentUserId,
       });
 
@@ -458,7 +452,7 @@ function PublicProfilePage() {
           <p className="mt-3 text-slate-500">{pageError || "This profile doesn't exist."}</p>
           <Link
             to="/discover"
-            className="mt-8 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+            className="mt-8 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
           >
             Back to discover
           </Link>
@@ -466,6 +460,8 @@ function PublicProfilePage() {
       </main>
     );
   }
+
+  const isOwnProfile = currentUserId === profile.id;
 
   return (
     <main className="min-h-screen bg-slate-50/80">
@@ -479,22 +475,13 @@ function PublicProfilePage() {
                 {getInitials(profile.full_name || 'Asobu User')}
               </div>
               <div className="hidden pb-1 sm:block">
-                <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">
-                  {profile.full_name || 'Unnamed user'}
-                </h1>
+                <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">{profile.full_name || 'Unnamed user'}</h1>
                 <p className="mt-1 text-base text-slate-500">{headline}</p>
               </div>
             </div>
 
             <div className="flex gap-3 pb-1">
-              {isOwnProfile ? (
-                <Link
-                  to="/profile"
-                  className="inline-flex items-center rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
-                >
-                  Edit profile
-                </Link>
-              ) : (
+              {!isOwnProfile && (
                 <Link
                   to={`/messages?with=${profile.id}`}
                   className="inline-flex items-center rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
@@ -520,7 +507,7 @@ function PublicProfilePage() {
             {roles.map((role) => (
               <span
                 key={role}
-                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+                className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide uppercase ${
                   role === primaryRole ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                 }`}
               >
@@ -530,7 +517,7 @@ function PublicProfilePage() {
             {sportLabels.map((sport) => (
               <span
                 key={sport}
-                className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-700"
+                className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold tracking-wide uppercase text-sky-700"
               >
                 {sport}
               </span>
@@ -555,17 +542,19 @@ function PublicProfilePage() {
             </div>
           ) : (
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {mediaPosts.map((post, index) => (
+              {mediaPosts.map((post, i) => (
                 <div
                   key={post.id}
-                  className={`group relative overflow-hidden rounded-2xl bg-slate-200 ${index === 0 ? 'col-span-2 row-span-2' : ''}`}
+                  className={`group relative overflow-hidden rounded-2xl bg-slate-200 ${
+                    i === 0 ? 'col-span-2 row-span-2' : ''
+                  }`}
                 >
                   {post.image_url && (
                     <img
                       src={post.image_url}
                       alt={post.content || `${profile.full_name || 'Asobu member'} media`}
                       className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${
-                        index === 0 ? 'h-72 sm:h-96' : 'h-44 sm:h-52'
+                        i === 0 ? 'h-72 sm:h-96' : 'h-44 sm:h-52'
                       }`}
                     />
                   )}
@@ -580,82 +569,6 @@ function PublicProfilePage() {
               ))}
             </div>
           )}
-        </section>
-
-        <section className="mt-12">
-          <div className="flex items-baseline justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Skill identity</h2>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                {skillTemplate.intro}
-              </p>
-            </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-              {skillTemplate.label}
-            </span>
-          </div>
-
-          <div className="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <SkillRadarChart title={`${skillTemplate.sportLabel} skill map`} points={radarPoints} />
-
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-900">Validation pulse</p>
-                <p className="mt-2 text-sm leading-7 text-slate-600">
-                  Self ratings shape the graph. The network can validate specific skills to reinforce credibility.
-                </p>
-                <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
-                  {skillTemplate.validationLabel}
-                </p>
-                {validationMessage && <p className="mt-3 text-sm text-slate-600">{validationMessage}</p>}
-              </div>
-
-              {topValidatedSkills.map((skill) => {
-                const isValidated = myValidatedSkillKeys.includes(skill.key);
-                const validationCount = skillValidationCounts[skill.key] || 0;
-
-                return (
-                  <div key={skill.key} className="rounded-2xl bg-white p-5 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-900">{skill.label}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                          {skill.shortLabel}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-slate-900">{skill.selfRating}</p>
-                        <p className="text-xs text-slate-500">
-                          {validationCount} validation{validationCount === 1 ? '' : 's'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <p className="mt-3 text-sm leading-7 text-slate-600">{skill.description}</p>
-
-                    {!isOwnProfile && currentUserId && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleValidation(skill.key)}
-                        disabled={validatingSkillKey === skill.key}
-                        className={`mt-4 inline-flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${
-                          isValidated
-                            ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                            : 'bg-slate-900 text-white hover:bg-slate-800'
-                        } ${validatingSkillKey === skill.key ? 'opacity-60' : ''}`}
-                      >
-                        {validatingSkillKey === skill.key
-                          ? 'Saving...'
-                          : isValidated
-                          ? 'Remove validation'
-                          : `Validate ${skill.label}`}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </section>
 
         <section className="mt-12">
@@ -674,9 +587,7 @@ function PublicProfilePage() {
             </div>
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Organizations</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">
-                {organizations.length > 0 ? organizations.length : '—'}
-              </p>
+              <p className="mt-2 text-lg font-bold text-slate-900">{organizations.length > 0 ? organizations.length : '—'}</p>
             </div>
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Profile</p>
@@ -771,12 +682,11 @@ function PublicProfilePage() {
             </section>
 
             <section>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-baseline justify-between gap-3">
                 <h2 className="text-lg font-semibold text-slate-900">Sporting history</h2>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                  {historyEntries.length} phases
-                </span>
+                <span className="text-xs font-medium text-slate-400">{historyEntries.length} phases</span>
               </div>
+
               {historyEntries.length > 0 ? (
                 <div className="mt-4 space-y-4">
                   {historyEntries.map((entry) => (
@@ -785,19 +695,31 @@ function PublicProfilePage() {
                       <div className="relative pl-8">
                         <div className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-slate-900" />
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-slate-900">{entry.organization_name}</p>
+                          {entry.organization_id ? (
+                            <Link to={`/organizations/${entry.organization_id}`} className="font-semibold text-slate-900 hover:text-sky-700">
+                              {entry.organization_name}
+                            </Link>
+                          ) : (
+                            <p className="font-semibold text-slate-900">{entry.organization_name}</p>
+                          )}
                           {entry.is_current && (
                             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
                               Current
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {(entry.role_label || 'Role not specified') + ' · ' + (entry.location || 'No location')}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                            {getPrimarySportLabelFromValue(entry.sport)}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                            {getPositionLabel(entry.sport, entry.position_key)}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          {(entry.organization_type || 'organization') + ' · ' + (entry.location || 'No location')}
                         </p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
-                          {formatHistoryPeriod(entry)}
-                        </p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">{formatHistoryPeriod(entry)}</p>
                         {entry.summary && <p className="mt-3 text-sm leading-7 text-slate-600">{entry.summary}</p>}
                       </div>
                     </div>
@@ -805,9 +727,7 @@ function PublicProfilePage() {
                 </div>
               ) : (
                 <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
-                  <p className="text-sm text-slate-400">
-                    Timeline of teams, phases, and development milestones will appear here.
-                  </p>
+                  <p className="text-sm text-slate-400">Timeline of teams, phases, and development milestones will appear here.</p>
                 </div>
               )}
             </section>
@@ -815,9 +735,59 @@ function PublicProfilePage() {
 
           <div className="space-y-6">
             <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Skill identity</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">{skillTemplate.validationLabel}</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-700">
+                  {skillTemplate.sportLabel}
+                </span>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                <SkillRadarChart points={radarPoints} title={skillTemplate.label} />
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {mergedSkillCards.map((skill) => {
+                  const isValidatedByMe = myValidatedSkillKeys.includes(skill.key);
+                  return (
+                    <div key={skill.key} className="rounded-xl border border-slate-200 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-slate-900">{skill.label}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Self {skill.selfRating} · {skillValidationCounts[skill.key] || 0} validations
+                          </p>
+                        </div>
+                        {!isOwnProfile && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSkillValidation(skill.key)}
+                            disabled={validatingSkillKey === skill.key}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                              isValidatedByMe
+                                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                : 'bg-sky-50 text-sky-700 hover:bg-sky-100'
+                            } disabled:opacity-60`}
+                          >
+                            {validatingSkillKey === skill.key ? '...' : isValidatedByMe ? 'Validated' : 'Validate'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {validationMessage && <p className="mt-4 text-sm text-slate-600">{validationMessage}</p>}
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900">Achievements</h3>
               <div className="mt-3 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
-                <p className="text-xs text-slate-400">Badges, milestones, and recognition will appear here.</p>
+                <p className="text-xs text-slate-400">Badges and recognition will appear here.</p>
               </div>
             </div>
 

@@ -19,6 +19,11 @@ import {
   resolveSkillTemplate,
   type SkillEntryValue,
 } from '../lib/skills';
+import {
+  getPositionGroupLabel,
+  getPositionLabel,
+  getPositionOptionsForSport,
+} from '../lib/positions';
 import { getPrimarySportLabelFromValue, SPORT_REGISTRATION_OPTIONS } from '../lib/sports';
 import { supabase } from '../lib/supabase';
 
@@ -44,6 +49,16 @@ type Organization = {
   cover_image_url?: string | null;
 };
 
+type SearchableOrganization = {
+  id: number;
+  name: string;
+  organization_type: string | null;
+  sport: string | null;
+  location: string | null;
+  description: string | null;
+  logo_url?: string | null;
+};
+
 type OrganizationMembershipRow = {
   id: number;
   organization_id: number;
@@ -66,14 +81,23 @@ type ProfileRoleRow = {
   created_at: string | null;
 };
 
-type RoleSelectionState = Record<PersonRole, boolean>;
+type HistoryOrganizationRef = {
+  id: number;
+  name: string;
+  organization_type: string | null;
+  sport: string | null;
+  location: string | null;
+  logo_url?: string | null;
+};
 
-type SportingHistoryEntry = {
+type SportingHistoryRow = {
   id: number;
   user_id: string;
   sport: string | null;
+  organization_id: number | null;
   organization_name: string;
   organization_type: string | null;
+  position_key: string | null;
   role_label: string | null;
   location: string | null;
   start_date: string | null;
@@ -82,6 +106,11 @@ type SportingHistoryEntry = {
   summary: string | null;
   created_at: string | null;
   updated_at: string | null;
+  organizations: HistoryOrganizationRef | HistoryOrganizationRef[] | null;
+};
+
+type SportingHistoryEntry = SportingHistoryRow & {
+  organizations: HistoryOrganizationRef | null;
 };
 
 type ProfileSkillEntry = {
@@ -101,11 +130,17 @@ type ProfileSkillValidation = {
   created_at: string | null;
 };
 
+type RoleSelectionState = Record<PersonRole, boolean>;
+
 type HistoryFormState = {
-  organizationName: string;
-  organizationType: string;
-  roleLabel: string;
-  location: string;
+  sport: string;
+  positionKey: string;
+  organizationSearch: string;
+  selectedOrganizationId: number | null;
+  createOrganizationInline: boolean;
+  inlineOrganizationName: string;
+  inlineOrganizationType: string;
+  inlineOrganizationLocation: string;
   startDate: string;
   endDate: string;
   isCurrent: boolean;
@@ -113,10 +148,14 @@ type HistoryFormState = {
 };
 
 const EMPTY_HISTORY_FORM: HistoryFormState = {
-  organizationName: '',
-  organizationType: 'team',
-  roleLabel: '',
-  location: '',
+  sport: '',
+  positionKey: '',
+  organizationSearch: '',
+  selectedOrganizationId: null,
+  createOrganizationInline: false,
+  inlineOrganizationName: '',
+  inlineOrganizationType: 'team',
+  inlineOrganizationLocation: '',
   startDate: '',
   endDate: '',
   isCurrent: false,
@@ -132,6 +171,11 @@ function getInitials(name: string) {
       .map((part) => part[0]?.toUpperCase() || '')
       .join('') || 'A'
   );
+}
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
 }
 
 function formatHistoryPeriod(entry: SportingHistoryEntry) {
@@ -158,6 +202,7 @@ function ProfilePage() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationWithRole[]>([]);
+  const [allOrganizations, setAllOrganizations] = useState<SearchableOrganization[]>([]);
 
   const [fullName, setFullName] = useState('');
   const [location, setLocation] = useState('');
@@ -199,6 +244,35 @@ function ProfilePage() {
         (option) => option.value
       ),
     [selectedRoles]
+  );
+
+  const historyPositionOptions = useMemo(
+    () => getPositionOptionsForSport(historyForm.sport || profile?.main_sport || mainSport || null),
+    [historyForm.sport, profile?.main_sport, mainSport]
+  );
+
+  const filteredHistoryOrganizations = useMemo(() => {
+    const query = historyForm.organizationSearch.trim().toLowerCase();
+    const selectedSport = (historyForm.sport || profile?.main_sport || mainSport || '').toLowerCase();
+
+    return allOrganizations
+      .filter((organization) => {
+        const matchesQuery =
+          !query ||
+          organization.name.toLowerCase().includes(query) ||
+          (organization.location || '').toLowerCase().includes(query);
+        const matchesSport =
+          !selectedSport ||
+          !(organization.sport || '').trim() ||
+          (organization.sport || '').toLowerCase().includes(selectedSport);
+        return matchesQuery && matchesSport;
+      })
+      .slice(0, 8);
+  }, [allOrganizations, historyForm.organizationSearch, historyForm.sport, profile?.main_sport, mainSport]);
+
+  const selectedHistoryOrganization = useMemo(
+    () => allOrganizations.find((organization) => organization.id === historyForm.selectedOrganizationId) || null,
+    [allOrganizations, historyForm.selectedOrganizationId]
   );
 
   const activeSportValue = profile?.main_sport || mainSport;
@@ -249,10 +323,18 @@ function ProfilePage() {
         setFullName(typedProfile.full_name || '');
         setLocation(typedProfile.location || '');
         setMainSport(typedProfile.main_sport || '');
+        setHistoryForm((current) => ({
+          ...current,
+          sport: current.sport || typedProfile.main_sport || '',
+        }));
         await loadProfileRoles(user.id, typedProfile);
       }
 
-      await Promise.all([loadOrganizations(user.id), loadSportingHistory(user.id)]);
+      await Promise.all([
+        loadOrganizations(user.id),
+        loadAllOrganizations(),
+        loadSportingHistory(user.id),
+      ]);
       setLoading(false);
     }
 
@@ -290,8 +372,8 @@ function ProfilePage() {
         : getUniquePersonRoles([currentProfile.role]);
 
     const safeRoles: PersonRole[] = normalizedRoles.length > 0 ? normalizedRoles : ['player'];
-    const primaryFromTable = typedRoles.find((item) => item.is_primary)?.role || currentProfile.role;
-    const safePrimary = getUniquePersonRoles([primaryFromTable])[0] || safeRoles[0];
+    const primaryFromTable = typedRoles.find((item) => item.is_primary)?.role as PersonRole | undefined;
+    const safePrimary = primaryFromTable && safeRoles.includes(primaryFromTable) ? primaryFromTable : safeRoles[0];
 
     setSelectedRoles(buildRoleSelectionMap(safeRoles));
     setPrimaryRole(safePrimary);
@@ -313,14 +395,8 @@ function ProfilePage() {
 
     const mapped: OrganizationWithRole[] = ((data as OrganizationMembershipRow[]) || [])
       .map((item) => {
-        const organization = Array.isArray(item.organizations)
-          ? item.organizations[0]
-          : item.organizations;
-
-        if (!organization) {
-          return null;
-        }
-
+        const organization = firstRelation(item.organizations);
+        if (!organization) return null;
         return {
           ...organization,
           member_role: item.member_role || 'member',
@@ -331,10 +407,27 @@ function ProfilePage() {
     setOrganizations(mapped);
   }
 
+  async function loadAllOrganizations() {
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('id, name, organization_type, sport, location, description, logo_url')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error loading searchable organizations:', error.message);
+      setAllOrganizations([]);
+      return;
+    }
+
+    setAllOrganizations((data as SearchableOrganization[]) || []);
+  }
+
   async function loadSportingHistory(userId: string) {
     const { data, error } = await supabase
       .from('sporting_history_entries')
-      .select('*')
+      .select(
+        'id, user_id, sport, organization_id, organization_name, organization_type, position_key, role_label, location, start_date, end_date, is_current, summary, created_at, updated_at, organizations(id, name, organization_type, sport, location, logo_url)'
+      )
       .eq('user_id', userId)
       .order('is_current', { ascending: false })
       .order('start_date', { ascending: false, nullsFirst: false });
@@ -347,7 +440,10 @@ function ProfilePage() {
     }
 
     setHistoryAvailable(true);
-    setHistoryEntries((data as SportingHistoryEntry[]) || []);
+    setHistoryEntries(((data as SportingHistoryRow[]) || []).map((entry) => ({
+      ...entry,
+      organizations: firstRelation(entry.organizations),
+    })));
   }
 
   async function loadProfileSkills(userId: string, sportKey: string) {
@@ -363,7 +459,9 @@ function ProfilePage() {
       setSkillsAvailable(false);
       setSkillEntries([]);
       setSkillRatings(
-        Object.fromEntries(buildDefaultSkillRatings(activeSkillTemplate).map((entry) => [entry.skill_key, entry.self_rating]))
+        Object.fromEntries(
+          buildDefaultSkillRatings(activeSkillTemplate).map((entry) => [entry.skill_key, entry.self_rating])
+        )
       );
       setSkillValidationCounts({});
       return;
@@ -462,10 +560,7 @@ function ProfilePage() {
       return;
     }
 
-    const { error: deleteRolesError } = await supabase
-      .from('profile_roles')
-      .delete()
-      .eq('user_id', profileId);
+    const { error: deleteRolesError } = await supabase.from('profile_roles').delete().eq('user_id', profileId);
 
     if (deleteRolesError) {
       console.warn('Could not replace profile_roles:', deleteRolesError.message);
@@ -478,7 +573,6 @@ function ProfilePage() {
       }));
 
       const { error: insertRolesError } = await supabase.from('profile_roles').insert(roleRows);
-
       if (insertRolesError) {
         console.warn('Could not save profile_roles:', insertRolesError.message);
       }
@@ -545,17 +639,21 @@ function ProfilePage() {
     setOrgDescription('');
     setOrgMessage('Organization created successfully.');
 
-    await loadOrganizations(profileId);
+    await Promise.all([loadOrganizations(profileId), loadAllOrganizations()]);
     setCreatingOrg(false);
   }
 
   function populateHistoryForm(entry: SportingHistoryEntry) {
     setEditingHistoryId(entry.id);
     setHistoryForm({
-      organizationName: entry.organization_name,
-      organizationType: entry.organization_type || 'team',
-      roleLabel: entry.role_label || '',
-      location: entry.location || '',
+      sport: entry.sport || profile?.main_sport || mainSport || '',
+      positionKey: entry.position_key || '',
+      organizationSearch: entry.organization_name,
+      selectedOrganizationId: entry.organization_id || entry.organizations?.id || null,
+      createOrganizationInline: false,
+      inlineOrganizationName: '',
+      inlineOrganizationType: entry.organization_type || 'team',
+      inlineOrganizationLocation: entry.location || '',
       startDate: entry.start_date || '',
       endDate: entry.end_date || '',
       isCurrent: entry.is_current,
@@ -565,25 +663,80 @@ function ProfilePage() {
 
   function resetHistoryForm() {
     setEditingHistoryId(null);
-    setHistoryForm(EMPTY_HISTORY_FORM);
+    setHistoryForm({
+      ...EMPTY_HISTORY_FORM,
+      sport: profile?.main_sport || mainSport || '',
+    });
     setHistoryMessage('');
   }
 
   async function handleSaveHistory(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!profileId || !historyForm.organizationName.trim()) return;
+    if (!profileId || !(historyForm.sport || '').trim() || !historyForm.positionKey) return;
 
     setSavingHistory(true);
     setHistoryMessage('');
 
+    let linkedOrganization = selectedHistoryOrganization;
+
+    if (!linkedOrganization && historyForm.createOrganizationInline) {
+      if (!historyForm.inlineOrganizationName.trim()) {
+        setHistoryMessage('Choose an existing organization or create a new one first.');
+        setSavingHistory(false);
+        return;
+      }
+
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .insert({
+          name: historyForm.inlineOrganizationName.trim(),
+          organization_type: historyForm.inlineOrganizationType,
+          sport: historyForm.sport.trim() || null,
+          location: historyForm.inlineOrganizationLocation.trim() || null,
+          description: null,
+          created_by: profileId,
+        })
+        .select('id, name, organization_type, sport, location, description, logo_url')
+        .single();
+
+      if (orgError) {
+        setHistoryMessage(`Error: ${orgError.message}`);
+        setSavingHistory(false);
+        return;
+      }
+
+      const { error: memberError } = await supabase.from('organization_members').insert({
+        organization_id: orgData.id,
+        user_id: profileId,
+        member_role: 'owner',
+      });
+
+      if (memberError) {
+        setHistoryMessage(`Error: ${memberError.message}`);
+        setSavingHistory(false);
+        return;
+      }
+
+      linkedOrganization = orgData as SearchableOrganization;
+      await Promise.all([loadOrganizations(profileId), loadAllOrganizations()]);
+    }
+
+    if (!linkedOrganization) {
+      setHistoryMessage('Select an existing organization or create it inline first.');
+      setSavingHistory(false);
+      return;
+    }
+
     const payload = {
       user_id: profileId,
-      sport: (profile?.main_sport || mainSport || '').trim() || null,
-      organization_name: historyForm.organizationName.trim(),
-      organization_type: historyForm.organizationType.trim() || null,
-      role_label: historyForm.roleLabel.trim() || null,
-      location: historyForm.location.trim() || null,
+      sport: historyForm.sport.trim() || null,
+      organization_id: linkedOrganization.id,
+      organization_name: linkedOrganization.name,
+      organization_type: linkedOrganization.organization_type || null,
+      position_key: historyForm.positionKey,
+      role_label: getPositionLabel(historyForm.sport, historyForm.positionKey),
+      location: linkedOrganization.location || historyForm.inlineOrganizationLocation.trim() || null,
       start_date: historyForm.startDate || null,
       end_date: historyForm.isCurrent ? null : historyForm.endDate || null,
       is_current: historyForm.isCurrent,
@@ -662,9 +815,7 @@ function ProfilePage() {
   if (loading) {
     return (
       <main className="px-6 py-6">
-        <div className="mx-auto max-w-5xl rounded-3xl bg-white p-6 shadow-sm">
-          Loading profile...
-        </div>
+        <div className="mx-auto max-w-5xl rounded-3xl bg-white p-6 shadow-sm">Loading profile...</div>
       </main>
     );
   }
@@ -682,11 +833,7 @@ function ProfilePage() {
     (publicReadinessChecks.filter(Boolean).length / publicReadinessChecks.length) * 100
   );
   const publicReadinessLabel =
-    publicReadinessScore >= 85
-      ? 'Strong public profile'
-      : publicReadinessScore >= 65
-      ? 'Good foundation'
-      : 'Early profile';
+    publicReadinessScore >= 85 ? 'Strong public profile' : publicReadinessScore >= 65 ? 'Good foundation' : 'Early profile';
   const publicNextSteps = [
     !(profile?.full_name || fullName).trim() && 'Add your full name',
     !(profile?.location || location).trim() && 'Add your location',
@@ -697,16 +844,11 @@ function ProfilePage() {
     mergedSkillCards.length === 0 && 'Build your skill identity',
   ].filter(Boolean) as string[];
   const openToLabels = getOpenToLabelsForRoles(selectedRoleValues);
-  const topValidatedSkills = [...mergedSkillCards]
-    .sort((a, b) => (skillValidationCounts[b.key] || 0) - (skillValidationCounts[a.key] || 0))
-    .slice(0, 3);
 
   if (!profile) {
     return (
       <main className="px-6 py-6">
-        <div className="mx-auto max-w-5xl rounded-3xl bg-white p-6 shadow-sm">
-          Profile not found.
-        </div>
+        <div className="mx-auto max-w-5xl rounded-3xl bg-white p-6 shadow-sm">Profile not found.</div>
       </main>
     );
   }
@@ -753,7 +895,7 @@ function ProfilePage() {
                 </div>
               </div>
 
-              <div className="w-full max-w-[360px] rounded-[28px] bg-slate-50 p-5 xl:min-w-[340px]">
+              <div className="w-full max-w-[340px] rounded-[28px] bg-slate-50 p-5 xl:min-w-[320px]">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">Public profile readiness</p>
@@ -764,52 +906,38 @@ function ProfilePage() {
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-4 gap-3">
-                  <div className="rounded-[20px] bg-white p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Roles</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{selectedRoleValues.length}</p>
-                  </div>
-                  <div className="rounded-[20px] bg-white p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Orgs</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{organizations.length}</p>
-                  </div>
-                  <div className="rounded-[20px] bg-white p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">History</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{historyEntries.length}</p>
-                  </div>
-                  <div className="rounded-[20px] bg-white p-4 text-center">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Skills</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{mergedSkillCards.length}</p>
-                  </div>
+                <div className="mt-4 space-y-2">
+                  {publicNextSteps.length > 0 ? (
+                    publicNextSteps.map((step) => (
+                      <div key={step} className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-600">
+                        {step}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-600">
+                      Your public profile already has a strong base for discovery.
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-3">
-                  {profileId && (
-                    <Link
-                      to={`/profiles/${profileId}`}
-                      className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
-                    >
-                      View public profile
-                    </Link>
-                  )}
+                  <Link
+                    to={`/profiles/${profile.id}`}
+                    className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                  >
+                    View public profile
+                  </Link>
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="rounded-[28px] bg-slate-50 p-5">
                 <p className="text-sm font-semibold text-slate-900">Identity summary</p>
                 <p className="mt-2 text-sm leading-7 text-slate-600">
                   {getIdentityContextLabel(selectedRoleValues, primaryRole)}
                 </p>
-                <p className="mt-2 text-sm leading-7 text-slate-600">
-                  Your public Asobu profile should feel like a mix of sports identity, social proof, and discoverability. Media, sporting history, and validated skills all increase trust.
-                </p>
-              </div>
-
-              <div className="rounded-[28px] bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-900">Open to on Asobu</p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   {openToLabels.length > 0 ? (
                     openToLabels.map((item) => (
                       <span key={item} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
@@ -818,61 +946,46 @@ function ProfilePage() {
                     ))
                   ) : (
                     <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                      Build your identity
+                      Building identity
                     </span>
                   )}
                 </div>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  This helps explain who should reach you on the platform as your public presence grows.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 rounded-[28px] border border-slate-200 p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">What the public profile is becoming</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    The public profile is now a real destination for discovery on Asobu. It can now combine media, sporting history, and a techier skill identity that feels closer to a sports network than a classic CV.
-                  </p>
-                </div>
-
-                <div className="rounded-[24px] bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  {publicNextSteps.length > 0
-                    ? `${publicNextSteps.length} next step${publicNextSteps.length > 1 ? 's' : ''} to strengthen visibility`
-                    : 'Public foundation looks strong'}
-                </div>
               </div>
 
-              {publicNextSteps.length > 0 && (
-                <div className="mt-5 rounded-[24px] bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-900">Recommended next steps</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {publicNextSteps.map((step) => (
-                      <span key={step} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                        {step}
-                      </span>
-                    ))}
+              <div className="rounded-[28px] bg-slate-50 p-5">
+                <p className="text-sm font-semibold text-slate-900">Trusted signals</p>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Roles</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{selectedRoleValues.length}</p>
+                  </div>
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Orgs</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{organizations.length}</p>
+                  </div>
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">History</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{historyEntries.length}</p>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
             <section className="rounded-3xl bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Edit profile</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Profile basics</h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Keep the core identity clean and consistent. The public profile pulls its foundation from these details.
+                    Keep your profile structured and standardized so scouts, coaches, and organizations can compare people more clearly.
                   </p>
                 </div>
               </div>
 
-              <form onSubmit={handleSave} className="mt-6 grid grid-cols-1 gap-4">
+              <form onSubmit={handleSave} className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Full name</label>
                   <input
@@ -880,45 +993,7 @@ function ProfilePage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                    placeholder="Your full name"
                   />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Roles</label>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {PERSON_ROLE_OPTIONS.map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedRoles[option.value]}
-                          onChange={() => handleRoleToggle(option.value)}
-                        />
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Primary role</label>
-                  <select
-                    value={primaryRole}
-                    onChange={(e) => setPrimaryRole(e.target.value as PersonRole)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  >
-                    {selectedRoleValues.map((role) => (
-                      <option key={role} value={role}>
-                        {formatPersonRoleLabel(role)}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-2 text-xs text-slate-500">
-                    The primary role stays your main public identity, while the other roles remain part of your deeper profile structure.
-                  </p>
                 </div>
 
                 <div>
@@ -949,6 +1024,44 @@ function ProfilePage() {
                 </div>
 
                 <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Primary role</label>
+                  <select
+                    value={primaryRole}
+                    onChange={(e) => setPrimaryRole(e.target.value as PersonRole)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                  >
+                    {selectedRoleValues.map((role) => (
+                      <option key={role} value={role}>
+                        {formatPersonRoleLabel(role)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <label className="mb-3 block text-sm font-medium text-slate-700">Roles</label>
+                  <div className="flex flex-wrap gap-3">
+                    {PERSON_ROLE_OPTIONS.map((roleOption) => {
+                      const isSelected = selectedRoles[roleOption.value];
+                      return (
+                        <button
+                          key={roleOption.value}
+                          type="button"
+                          onClick={() => handleRoleToggle(roleOption.value)}
+                          className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                            isSelected
+                              ? 'border-slate-900 bg-slate-900 text-white'
+                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {roleOption.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2 flex flex-wrap gap-3">
                   <button
                     type="submit"
                     disabled={saving}
@@ -958,7 +1071,7 @@ function ProfilePage() {
                   </button>
                 </div>
 
-                {message && <p className="text-sm text-slate-600">{message}</p>}
+                {message && <p className="lg:col-span-2 text-sm text-slate-600">{message}</p>}
               </form>
             </section>
 
@@ -967,70 +1080,45 @@ function ProfilePage() {
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Skill identity</h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {activeSkillTemplate.intro}
+                    Self-assess your current attributes and build a sports-tech profile layer that will later evolve with validation and match-linked signals.
                   </p>
                 </div>
-                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                  {activeSkillTemplate.label}
-                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  {activeSkillTemplate.sportLabel}
+                </span>
               </div>
 
               {!skillsAvailable ? (
                 <div className="mt-5 rounded-[24px] bg-slate-50 p-4 text-sm text-slate-600">
-                  Skill identity becomes available after the SQL bundle is applied in Supabase.
+                  Skills become available after the SQL bundle is applied in Supabase.
                 </div>
               ) : (
                 <>
-                  <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-                    <SkillRadarChart title={`${activeSkillTemplate.sportLabel} skill map`} points={radarPoints} />
+                  <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+                    <div className="rounded-[28px] bg-slate-50 p-5">
+                      <SkillRadarChart
+                        points={radarPoints}
+                        title={activeSkillTemplate.label}
+                      />
+                    </div>
 
-                    <div className="space-y-3">
-                      <div className="rounded-[28px] bg-slate-50 p-5">
-                        <p className="text-sm font-semibold text-slate-900">Validation pulse</p>
-                        <p className="mt-2 text-sm leading-7 text-slate-600">
-                          {activeSkillTemplate.validationLabel}. Self ratings build the graph, while validations create social proof.
-                        </p>
-                      </div>
-
-                      {topValidatedSkills.map((skill) => (
+                    <div className="space-y-4">
+                      {mergedSkillCards.map((skill) => (
                         <div key={skill.key} className="rounded-[24px] border border-slate-200 p-4">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="font-semibold text-slate-900">{skill.label}</p>
-                              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                                {skill.shortLabel}
-                              </p>
+                              <p className="mt-1 text-sm leading-7 text-slate-500">{skill.description}</p>
                             </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-slate-900">{skill.selfRating}</p>
-                              <p className="text-xs text-slate-500">
-                                {skillValidationCounts[skill.key] || 0} validation{(skillValidationCounts[skill.key] || 0) === 1 ? '' : 's'}
-                              </p>
-                            </div>
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                              {skill.selfRating}
+                            </span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    {mergedSkillCards.map((skill) => (
-                      <div key={skill.key} className="rounded-[24px] bg-slate-50 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-slate-900">{skill.label}</p>
-                            <p className="mt-1 text-sm text-slate-500">{skill.description}</p>
-                          </div>
-                          <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                            {skillValidationCounts[skill.key] || 0} validation{(skillValidationCounts[skill.key] || 0) === 1 ? '' : 's'}
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex items-center gap-4">
                           <input
                             type="range"
-                            min="20"
-                            max="99"
+                            min={20}
+                            max={99}
                             value={skillRatings[skill.key] ?? skill.selfRating}
                             onChange={(e) =>
                               setSkillRatings((current) => ({
@@ -1038,20 +1126,19 @@ function ProfilePage() {
                                 [skill.key]: Number(e.target.value),
                               }))
                             }
-                            className="w-full"
+                            className="mt-4 w-full"
                           />
-                          <div className="w-14 rounded-xl bg-white px-3 py-2 text-center text-sm font-bold text-slate-900">
-                            {Math.round(skillRatings[skill.key] ?? skill.selfRating)}
+
+                          <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                            <span>Self rating</span>
+                            <span>{skillValidationCounts[skill.key] || 0} validations</span>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-slate-500">
-                      Start with honest self-assessment. Validations from the network can strengthen the profile over time.
-                    </p>
+                  <div className="mt-5 flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={handleSaveSkills}
@@ -1070,9 +1157,9 @@ function ProfilePage() {
             <section className="rounded-3xl bg-white p-6 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Sporting history</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Structured sporting history</h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Build the timeline of your development. This should feel more like a structured sports journey than a plain CV.
+                    Build the timeline of your development using a real sport, a standardized position, and a shared club or team on Asobu.
                   </p>
                 </div>
                 <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -1088,28 +1175,41 @@ function ProfilePage() {
                 <>
                   <form onSubmit={handleSaveHistory} className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Organization name</label>
-                      <input
-                        type="text"
-                        value={historyForm.organizationName}
-                        onChange={(e) =>
-                          setHistoryForm((current) => ({ ...current, organizationName: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="FC Lugano U21"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Organization type</label>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Sport</label>
                       <select
-                        value={historyForm.organizationType}
+                        value={historyForm.sport}
                         onChange={(e) =>
-                          setHistoryForm((current) => ({ ...current, organizationType: e.target.value }))
+                          setHistoryForm((current) => ({
+                            ...current,
+                            sport: e.target.value,
+                            positionKey: '',
+                            selectedOrganizationId: null,
+                          }))
                         }
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
                       >
-                        {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
+                        <option value="">Choose a sport</option>
+                        {SPORT_REGISTRATION_OPTIONS.map((sport) => (
+                          <option key={sport.value} value={sport.label}>
+                            {sport.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        {getPositionGroupLabel(historyForm.sport || profile?.main_sport || mainSport || null)}
+                      </label>
+                      <select
+                        value={historyForm.positionKey}
+                        onChange={(e) =>
+                          setHistoryForm((current) => ({ ...current, positionKey: e.target.value }))
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                      >
+                        <option value="">Choose a position</option>
+                        {historyPositionOptions.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
@@ -1117,31 +1217,153 @@ function ProfilePage() {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Role in that phase</label>
+                    <div className="lg:col-span-2">
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Find existing organization</label>
                       <input
                         type="text"
-                        value={historyForm.roleLabel}
+                        value={historyForm.organizationSearch}
                         onChange={(e) =>
-                          setHistoryForm((current) => ({ ...current, roleLabel: e.target.value }))
+                          setHistoryForm((current) => ({
+                            ...current,
+                            organizationSearch: e.target.value,
+                            selectedOrganizationId: null,
+                            createOrganizationInline: false,
+                            inlineOrganizationName: e.target.value,
+                          }))
                         }
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="Central midfielder / Assistant coach"
+                        placeholder="Search for Rugby Lugano, FC Lugano, Volley Team..."
                       />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Select the real organization if it already exists. If not, create it below so this sporting phase stays linked to the same shared club or team other players can find.
+                      </p>
                     </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Location</label>
-                      <input
-                        type="text"
-                        value={historyForm.location}
-                        onChange={(e) =>
-                          setHistoryForm((current) => ({ ...current, location: e.target.value }))
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="Lugano, Switzerland"
-                      />
-                    </div>
+                    {selectedHistoryOrganization ? (
+                      <div className="lg:col-span-2 rounded-[24px] border border-sky-200 bg-sky-50 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-slate-900">{selectedHistoryOrganization.name}</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {(selectedHistoryOrganization.organization_type || 'organization') +
+                                ' · ' +
+                                (selectedHistoryOrganization.location || 'No location')}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setHistoryForm((current) => ({
+                                ...current,
+                                selectedOrganizationId: null,
+                                organizationSearch: '',
+                              }))
+                            }
+                            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    ) : filteredHistoryOrganizations.length > 0 ? (
+                      <div className="lg:col-span-2 rounded-[24px] border border-slate-200 bg-white p-3">
+                        <div className="space-y-2">
+                          {filteredHistoryOrganizations.map((organization) => (
+                            <button
+                              key={organization.id}
+                              type="button"
+                              onClick={() =>
+                                setHistoryForm((current) => ({
+                                  ...current,
+                                  selectedOrganizationId: organization.id,
+                                  organizationSearch: organization.name,
+                                  createOrganizationInline: false,
+                                }))
+                              }
+                              className="flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                            >
+                              <div>
+                                <p className="font-medium text-slate-900">{organization.name}</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {(organization.organization_type || 'organization') +
+                                    ' · ' +
+                                    (organization.location || 'No location')}
+                                </p>
+                              </div>
+                              <span className="rounded-full bg-sky-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                                {getPrimarySportLabelFromValue(organization.sport)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : historyForm.organizationSearch.trim() ? (
+                      <div className="lg:col-span-2 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4">
+                        <label className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={historyForm.createOrganizationInline}
+                            onChange={(e) =>
+                              setHistoryForm((current) => ({
+                                ...current,
+                                createOrganizationInline: e.target.checked,
+                                inlineOrganizationName: current.organizationSearch || current.inlineOrganizationName,
+                              }))
+                            }
+                          />
+                          <span className="text-sm leading-7 text-slate-600">
+                            I can’t find this organization. Create it now so it becomes a real shared club or team on Asobu.
+                          </span>
+                        </label>
+                      </div>
+                    ) : null}
+
+                    {historyForm.createOrganizationInline && !selectedHistoryOrganization && (
+                      <>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-slate-700">New organization name</label>
+                          <input
+                            type="text"
+                            value={historyForm.inlineOrganizationName}
+                            onChange={(e) =>
+                              setHistoryForm((current) => ({ ...current, inlineOrganizationName: e.target.value }))
+                            }
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                            placeholder="Rugby Lugano"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-slate-700">Organization type</label>
+                          <select
+                            value={historyForm.inlineOrganizationType}
+                            onChange={(e) =>
+                              setHistoryForm((current) => ({ ...current, inlineOrganizationType: e.target.value }))
+                            }
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          >
+                            {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="lg:col-span-2">
+                          <label className="mb-2 block text-sm font-medium text-slate-700">Organization location</label>
+                          <input
+                            type="text"
+                            value={historyForm.inlineOrganizationLocation}
+                            onChange={(e) =>
+                              setHistoryForm((current) => ({ ...current, inlineOrganizationLocation: e.target.value }))
+                            }
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                            placeholder="Lugano, Switzerland"
+                          />
+                        </div>
+                      </>
+                    )}
 
                     <div>
                       <label className="mb-2 block text-sm font-medium text-slate-700">Start date</label>
@@ -1181,7 +1403,7 @@ function ProfilePage() {
                             }))
                           }
                         />
-                        This is a current phase
+                        This is my current phase
                       </label>
                     </div>
 
@@ -1192,8 +1414,8 @@ function ProfilePage() {
                         onChange={(e) =>
                           setHistoryForm((current) => ({ ...current, summary: e.target.value }))
                         }
-                        className="min-h-[110px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="What mattered in this phase? Development stage, level, responsibilities, or achievements."
+                        className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                        placeholder="Describe the role, development stage, or what made this phase important."
                       />
                     </div>
 
@@ -1206,8 +1428,8 @@ function ProfilePage() {
                         {savingHistory
                           ? 'Saving...'
                           : editingHistoryId
-                          ? 'Update history entry'
-                          : 'Add history entry'}
+                          ? 'Update sporting history'
+                          : 'Add sporting history'}
                       </button>
 
                       {editingHistoryId && (
@@ -1224,22 +1446,38 @@ function ProfilePage() {
                     {historyMessage && <p className="lg:col-span-2 text-sm text-slate-600">{historyMessage}</p>}
                   </form>
 
-                  <div className="mt-8 space-y-3">
+                  <div className="mt-5 space-y-3">
                     {historyEntries.length > 0 ? (
                       historyEntries.map((entry) => (
                         <div key={entry.id} className="rounded-[24px] border border-slate-200 p-4">
                           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className="font-semibold text-slate-900">{entry.organization_name}</p>
+                                {entry.organization_id ? (
+                                  <Link to={`/organizations/${entry.organization_id}`} className="font-semibold text-slate-900 hover:text-sky-700">
+                                    {entry.organization_name}
+                                  </Link>
+                                ) : (
+                                  <p className="font-semibold text-slate-900">{entry.organization_name}</p>
+                                )}
                                 {entry.is_current && (
                                   <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
                                     Current
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-1 text-sm text-slate-500">
-                                {(entry.role_label || 'Role not specified') + ' · ' + (entry.location || 'No location')}
+
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                                  {getPrimarySportLabelFromValue(entry.sport)}
+                                </span>
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                                  {getPositionLabel(entry.sport, entry.position_key)}
+                                </span>
+                              </div>
+
+                              <p className="mt-2 text-sm text-slate-500">
+                                {(entry.organization_type || 'organization') + ' · ' + (entry.location || 'No location')}
                               </p>
                               <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
                                 {formatHistoryPeriod(entry)}
@@ -1405,9 +1643,7 @@ function ProfilePage() {
                           <p className="mt-1 text-sm text-slate-500 capitalize">
                             {organization.organization_type || 'organization'} · {organization.member_role}
                           </p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {organization.location || 'No location'}
-                          </p>
+                          <p className="mt-1 text-sm text-slate-500">{organization.location || 'No location'}</p>
                         </div>
                       </div>
 
