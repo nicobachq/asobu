@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SkillRadarChart from '../components/SkillRadarChart';
+import SkillValueBar from '../components/SkillValueBar';
 import {
   buildRoleSelectionMap,
   formatPersonRoleLabel,
@@ -303,6 +304,16 @@ function ProfilePage() {
       })),
     [mergedSkillCards]
   );
+
+  const hasCompleteSavedSkillIdentity = useMemo(
+    () =>
+      activeSkillTemplate.skills.every((skill) =>
+        skillEntries.some((entry) => entry.skill_key === skill.key)
+      ),
+    [activeSkillTemplate.skills, skillEntries]
+  );
+
+  const isSkillIdentityLocked = hasCompleteSavedSkillIdentity;
 
   useEffect(() => {
     async function loadProfile() {
@@ -800,6 +811,11 @@ function ProfilePage() {
   async function handleSaveSkills() {
     if (!profileId) return;
 
+    if (isSkillIdentityLocked) {
+      setSkillMessage('Your initial self-rating is already locked for this sport.');
+      return;
+    }
+
     setSavingSkills(true);
     setSkillMessage('');
 
@@ -1094,12 +1110,25 @@ function ProfilePage() {
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Skill identity</h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Set your initial self-assessment, then let anonymous signals from players and coaches gradually shape the public community score.
+                    {isSkillIdentityLocked
+                      ? 'Your initial self-rating is locked. Anonymous signals from players and coaches can still shift the public community score over time.'
+                      : 'Set your initial self-assessment, then let anonymous signals from players and coaches gradually shape the public community score.'}
                   </p>
                 </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                  {activeSkillTemplate.sportLabel}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                    {activeSkillTemplate.sportLabel}
+                  </span>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      isSkillIdentityLocked
+                        ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'
+                        : 'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200'
+                    }`}
+                  >
+                    {isSkillIdentityLocked ? 'Initial rating locked' : 'Initial rating editable'}
+                  </span>
+                </div>
               </div>
 
               {!skillsAvailable ? (
@@ -1117,58 +1146,75 @@ function ProfilePage() {
                     </div>
 
                     <div className="space-y-4">
-                      {mergedSkillCards.map((skill) => (
-                        <div key={skill.key} className="rounded-[24px] border border-slate-200 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-slate-900">{skill.label}</p>
-                              <p className="mt-1 text-sm leading-7 text-slate-500">{skill.description}</p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                                Self {skill.selfRating}
-                              </span>
-                              <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
-                                Community {skill.communityScore}
-                              </span>
-                            </div>
-                          </div>
+                      {mergedSkillCards.map((skill) => {
+                        const displayedSelfRating = skillRatings[skill.key] ?? skill.selfRating;
 
-                          <input
-                            type="range"
-                            min={20}
-                            max={99}
-                            value={skillRatings[skill.key] ?? skill.selfRating}
-                            onChange={(e) =>
-                              setSkillRatings((current) => ({
-                                ...current,
-                                [skill.key]: Number(e.target.value),
-                              }))
-                            }
-                            className="mt-4 w-full"
-                          />
+                        return (
+                          <div key={skill.key} className="rounded-[24px] border border-slate-200 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-slate-900">{skill.label}</p>
+                                <p className="mt-1 text-sm leading-7 text-slate-500">{skill.description}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                    isSkillIdentityLocked
+                                      ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'
+                                      : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  Self {displayedSelfRating}
+                                </span>
+                                <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+                                  Community {skill.communityScore}
+                                </span>
+                              </div>
+                            </div>
 
-                          <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                            <span>Self rating</span>
-                            <span>{skill.validationSummary.totalCount} anonymous votes</span>
+                            <SkillValueBar
+                              value={displayedSelfRating}
+                              isLocked={isSkillIdentityLocked}
+                              ariaLabel={`${skill.label} self rating`}
+                              onChange={
+                                isSkillIdentityLocked
+                                  ? undefined
+                                  : (value) =>
+                                      setSkillRatings((current) => ({
+                                        ...current,
+                                        [skill.key]: value,
+                                      }))
+                              }
+                            />
+
+                            <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                              <span>{isSkillIdentityLocked ? 'Self rating locked' : 'Self rating'}</span>
+                              <span>{skill.validationSummary.totalCount} anonymous votes</span>
+                            </div>
+                            <p className="mt-2 text-[11px] text-slate-400">
+                              {skill.validationSummary.higherCount} higher · {skill.validationSummary.fairCount} fair · {skill.validationSummary.lowerCount} lower
+                            </p>
                           </div>
-                          <p className="mt-2 text-[11px] text-slate-400">
-                            {skill.validationSummary.higherCount} higher · {skill.validationSummary.fairCount} fair · {skill.validationSummary.lowerCount} lower
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
                   <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={handleSaveSkills}
-                      disabled={savingSkills}
-                      className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                    >
-                      {savingSkills ? 'Saving...' : 'Save skill identity'}
-                    </button>
+                    {isSkillIdentityLocked ? (
+                      <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-inset ring-slate-200">
+                        Initial self-rating saved and locked for this sport.
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSaveSkills}
+                        disabled={savingSkills}
+                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {savingSkills ? 'Saving...' : 'Save skill identity'}
+                      </button>
+                    )}
                   </div>
 
                   {skillMessage && <p className="mt-4 text-sm text-slate-600">{skillMessage}</p>}
