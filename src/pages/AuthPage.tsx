@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   buildRoleSelectionMap,
   formatPersonRoleLabel,
@@ -14,11 +15,11 @@ import { SPORT_REGISTRATION_OPTIONS } from "../lib/sports";
 import { supabase } from "../lib/supabase";
 
 type SignUpPath = "person" | "organization";
-
 type RoleSelectionState = Record<PersonRole, boolean>;
 
 function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [searchParams] = useSearchParams();
+  const [isLogin, setIsLogin] = useState(searchParams.get("mode") !== "signup");
   const [signUpPath, setSignUpPath] = useState<SignUpPath>("person");
 
   const [email, setEmail] = useState("");
@@ -40,6 +41,10 @@ function AuthPage() {
   const [organizationSport, setOrganizationSport] = useState("");
   const [organizationLocation, setOrganizationLocation] = useState("");
   const [organizationDescription, setOrganizationDescription] = useState("");
+
+  useEffect(() => {
+    setIsLogin(searchParams.get("mode") !== "signup");
+  }, [searchParams]);
 
   const selectedRoleValues = useMemo(
     () =>
@@ -244,329 +249,343 @@ function AuthPage() {
   }
 
   return (
-    <main className="px-6 py-10">
-      <div className="mx-auto max-w-4xl rounded-[32px] bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              {isLogin ? "Log in to Asobu" : "Create your Asobu account"}
-            </h1>
-
-            <p className="mt-3 text-sm leading-7 text-slate-500">
-              Build a sports identity for players, coaches, scouts, teams, federations,
-              and other sport organizations.
-            </p>
-
-            {!isLogin && (
-              <>
-                <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                    Registration path
-                  </p>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {[
-                      {
-                        key: "person",
-                        label: "I am joining as a person",
-                        description: "Player, coach, or scout",
-                      },
-                      {
-                        key: "organization",
-                        label: "I am registering an organization",
-                        description: "Team, federation, club, entity, or community",
-                      },
-                    ].map((option) => (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => setSignUpPath(option.key as SignUpPath)}
-                        className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                          signUpPath === option.key
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                        }`}
-                      >
-                        <div className="font-medium">{option.label}</div>
-                        <div
-                          className={`mt-1 text-xs ${
-                            signUpPath === option.key ? "text-white/75" : "text-slate-500"
-                          }`}
-                        >
-                          {option.description}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-6 rounded-[28px] bg-slate-50 p-5">
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    {signUpPath === "person" ? "Identity model" : "Organization model"}
-                  </h2>
-                  {signUpPath === "person" ? (
-                    <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
-                      <p>
-                        One account can carry more than one sports role. A coach can also
-                        be a player, and that identity can become searchable later across
-                        Discover.
-                      </p>
-                      <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
-                        <p className="font-semibold text-slate-900">
-                          {formatRoleSummary(selectedRoleValues, primaryRole)}
-                        </p>
-                        <p className="mt-1 text-slate-500">
-                          {getIdentityContextLabel(selectedRoleValues, primaryRole)}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
-                      <p>
-                        On Asobu, organization is the umbrella for {getOrganizationTypeAudienceLabel().toLowerCase()}, but every organization still has a real human owner behind it.
-                      </p>
-                      <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
-                        <p className="font-semibold text-slate-900">
-                          {ORGANIZATION_REGISTRATION_OPTIONS.find(
-                            (option) => option.value === organizationType
-                          )?.label || "Organization"}
-                        </p>
-                        <p className="mt-1 text-slate-500">
-                          {ORGANIZATION_REGISTRATION_OPTIONS.find(
-                            (option) => option.value === organizationType
-                          )?.description || ""}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            {!isLogin && (
-              <>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Full name
-                  </label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                    placeholder="Your full name"
-                    required={!isLogin}
-                  />
-                </div>
-
-                {signUpPath === "person" ? (
-                  <>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Roles
-                      </label>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        {PERSON_ROLE_OPTIONS.map((option) => (
-                          <label
-                            key={option.value}
-                            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedRoles[option.value]}
-                              onChange={() => handleRoleToggle(option.value)}
-                            />
-                            <span>{option.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Primary role
-                      </label>
-                      <select
-                        value={primaryRole}
-                        onChange={(e) => setPrimaryRole(e.target.value as PersonRole)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                      >
-                        {selectedRoleValues.map((role) => (
-                          <option key={role} value={role}>
-                            {formatPersonRoleLabel(role)}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="mt-2 text-xs text-slate-500">
-                        Your primary role stays the main public label, while your other
-                        roles remain part of the deeper identity model.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Main sport
-                      </label>
-                      <select
-                        value={mainSport}
-                        onChange={(e) => setMainSport(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                      >
-                        <option value="">Choose a sport</option>
-                        {SPORT_REGISTRATION_OPTIONS.map((sport) => (
-                          <option key={sport.value} value={sport.label}>
-                            {sport.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Location
-                      </label>
-                      <input
-                        type="text"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="Lugano, Switzerland"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Organization name
-                      </label>
-                      <input
-                        type="text"
-                        value={organizationName}
-                        onChange={(e) => setOrganizationName(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="FC Asobu Academy"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Organization type
-                      </label>
-                      <select
-                        value={organizationType}
-                        onChange={(e) =>
-                          setOrganizationType(e.target.value as OrganizationRegistrationType)
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                      >
-                        {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Main sport
-                      </label>
-                      <select
-                        value={organizationSport}
-                        onChange={(e) => setOrganizationSport(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                      >
-                        <option value="">Choose a sport</option>
-                        {SPORT_REGISTRATION_OPTIONS.map((sport) => (
-                          <option key={sport.value} value={sport.label}>
-                            {sport.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Location
-                      </label>
-                      <input
-                        type="text"
-                        value={organizationLocation}
-                        onChange={(e) => setOrganizationLocation(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="Zurich, Switzerland"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Description
-                      </label>
-                      <textarea
-                        value={organizationDescription}
-                        onChange={(e) => setOrganizationDescription(e.target.value)}
-                        className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                        placeholder="Short description"
-                      />
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-            >
-              {loading ? "Please wait..." : isLogin ? "Log in" : "Create account"}
-            </button>
-          </form>
+    <main className="min-h-screen bg-slate-100 px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <Link to="/" className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
+            Asobu
+          </Link>
+          <Link
+            to="/"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Back to landing page
+          </Link>
         </div>
 
-        {message && <p className="mt-5 text-sm text-slate-600">{message}</p>}
+        <div className="rounded-[32px] bg-white p-5 shadow-sm sm:p-6 lg:p-7">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:gap-7">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-[2rem]">
+                {isLogin ? "Log in to Asobu" : "Create your Asobu account"}
+              </h1>
 
-        <button
-          type="button"
-          onClick={() => {
-            setIsLogin(!isLogin);
-            setMessage("");
-          }}
-          className="mt-5 text-sm font-medium text-sky-700 hover:text-sky-800"
-        >
-          {isLogin ? "Need an account? Sign up" : "Already have an account? Log in"}
-        </button>
+              <p className="mt-3 text-sm leading-7 text-slate-500 sm:text-base">
+                Build a structured sports identity for players, coaches, scouts, teams,
+                clubs, federations, entities, and communities.
+              </p>
+
+              {!isLogin && (
+                <>
+                  <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                      Registration path
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {[
+                        {
+                          key: "person",
+                          label: "I am joining as a person",
+                          description: "Player, coach, or scout",
+                        },
+                        {
+                          key: "organization",
+                          label: "I am registering an organization",
+                          description: "Team, federation, club, entity, or community",
+                        },
+                      ].map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setSignUpPath(option.key as SignUpPath)}
+                          className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                            signUpPath === option.key
+                              ? "border-slate-900 bg-slate-900 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          <div className="font-medium">{option.label}</div>
+                          <div
+                            className={`mt-1 text-xs ${
+                              signUpPath === option.key ? "text-white/75" : "text-slate-500"
+                            }`}
+                          >
+                            {option.description}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 rounded-[28px] bg-slate-50 p-5">
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {signUpPath === "person" ? "Identity model" : "Organization model"}
+                    </h2>
+                    {signUpPath === "person" ? (
+                      <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
+                        <p>
+                          One account can carry more than one sports role. A coach can also
+                          be a player, and that identity can become searchable later across
+                          Discover.
+                        </p>
+                        <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
+                          <p className="font-semibold text-slate-900">
+                            {formatRoleSummary(selectedRoleValues, primaryRole)}
+                          </p>
+                          <p className="mt-1 text-slate-500">
+                            {getIdentityContextLabel(selectedRoleValues, primaryRole)}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
+                        <p>
+                          On Asobu, organization is the umbrella for {getOrganizationTypeAudienceLabel().toLowerCase()}, but every organization still has a real human owner behind it.
+                        </p>
+                        <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
+                          <p className="font-semibold text-slate-900">
+                            {ORGANIZATION_REGISTRATION_OPTIONS.find(
+                              (option) => option.value === organizationType
+                            )?.label || "Organization"}
+                          </p>
+                          <p className="mt-1 text-slate-500">
+                            {ORGANIZATION_REGISTRATION_OPTIONS.find(
+                              (option) => option.value === organizationType
+                            )?.description || ""}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4 rounded-[28px] border border-slate-200 bg-slate-50 p-4 sm:p-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              {!isLogin && (
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Full name
+                    </label>
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                      placeholder="Your full name"
+                      required={!isLogin}
+                    />
+                  </div>
+
+                  {signUpPath === "person" ? (
+                    <>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Roles
+                        </label>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          {PERSON_ROLE_OPTIONS.map((option) => (
+                            <label
+                              key={option.value}
+                              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedRoles[option.value]}
+                                onChange={() => handleRoleToggle(option.value)}
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Primary role
+                        </label>
+                        <select
+                          value={primaryRole}
+                          onChange={(e) => setPrimaryRole(e.target.value as PersonRole)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                        >
+                          {selectedRoleValues.map((role) => (
+                            <option key={role} value={role}>
+                              {formatPersonRoleLabel(role)}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-2 text-xs text-slate-500">
+                          Your primary role stays the main public label, while your other
+                          roles remain part of the deeper identity model.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Main sport
+                        </label>
+                        <select
+                          value={mainSport}
+                          onChange={(e) => setMainSport(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                        >
+                          <option value="">Choose a sport</option>
+                          {SPORT_REGISTRATION_OPTIONS.map((sport) => (
+                            <option key={sport.value} value={sport.label}>
+                              {sport.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Location
+                        </label>
+                        <input
+                          type="text"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          placeholder="Lugano, Switzerland"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Organization name
+                        </label>
+                        <input
+                          type="text"
+                          value={organizationName}
+                          onChange={(e) => setOrganizationName(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          placeholder="FC Asobu Academy"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Organization type
+                        </label>
+                        <select
+                          value={organizationType}
+                          onChange={(e) =>
+                            setOrganizationType(e.target.value as OrganizationRegistrationType)
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                        >
+                          {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Main sport
+                        </label>
+                        <select
+                          value={organizationSport}
+                          onChange={(e) => setOrganizationSport(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                        >
+                          <option value="">Choose a sport</option>
+                          {SPORT_REGISTRATION_OPTIONS.map((sport) => (
+                            <option key={sport.value} value={sport.label}>
+                              {sport.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Location
+                        </label>
+                        <input
+                          type="text"
+                          value={organizationLocation}
+                          onChange={(e) => setOrganizationLocation(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          placeholder="Zurich, Switzerland"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Description
+                        </label>
+                        <textarea
+                          value={organizationDescription}
+                          onChange={(e) => setOrganizationDescription(e.target.value)}
+                          className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          placeholder="Short description"
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+              >
+                {loading ? "Please wait..." : isLogin ? "Log in" : "Create account"}
+              </button>
+
+              {message && <p className="text-sm text-slate-600">{message}</p>}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setMessage("");
+                }}
+                className="text-sm font-medium text-sky-700 hover:text-sky-800"
+              >
+                {isLogin ? "Need an account? Sign up" : "Already have an account? Log in"}
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </main>
   );
