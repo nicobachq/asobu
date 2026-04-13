@@ -4,11 +4,12 @@ import {
   formatPersonRoleLabel,
   formatRoleSummary,
   getIdentityContextLabel,
+  getOpenToLabelsForRoles,
   getUniquePersonRoles,
   normalizePersonRole,
   type PersonRole,
 } from "../lib/identity";
-import { getSportLabelsFromValue } from "../lib/sports";
+import { getPrimarySportLabelFromValue, getSportLabelsFromValue } from "../lib/sports";
 import { supabase } from "../lib/supabase";
 
 type Profile = {
@@ -64,6 +65,12 @@ function getInitials(name: string) {
       .join("") || "A"
   );
 }
+
+const ROLE_DESCRIPTIONS: Record<PersonRole, string> = {
+  player: "Build a visible athlete identity, share media, and be discovered by coaches or scouts.",
+  coach: "Represent technical leadership, player development, and team or organization context.",
+  scout: "Discover talent, follow profiles, and start conversations directly inside Asobu.",
+};
 
 function PublicProfilePage() {
   const { id } = useParams();
@@ -168,7 +175,10 @@ function PublicProfilePage() {
     loadPage();
   }, [id]);
 
-  const sportLabels = useMemo(() => getSportLabelsFromValue(profile?.main_sport || null), [profile?.main_sport]);
+  const sportLabels = useMemo(
+    () => getSportLabelsFromValue(profile?.main_sport || null),
+    [profile?.main_sport]
+  );
 
   if (loading) {
     return (
@@ -187,7 +197,10 @@ function PublicProfilePage() {
           <h1 className="text-2xl font-bold text-slate-900">Public profile</h1>
           <p className="mt-3 text-sm text-slate-600">{pageError || "Profile not found."}</p>
           <div className="mt-6">
-            <Link to="/discover" className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800">
+            <Link
+              to="/discover"
+              className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+            >
               Back to discover
             </Link>
           </div>
@@ -199,16 +212,28 @@ function PublicProfilePage() {
   const isOwnProfile = currentUserId === profile.id;
   const headline = formatRoleSummary(roles, primaryRole);
   const identityContext = getIdentityContextLabel(roles, primaryRole);
+  const openToLabels = getOpenToLabelsForRoles(roles);
+  const readinessChecks = [
+    Boolean(profile.full_name?.trim()),
+    Boolean(profile.location?.trim()),
+    sportLabels.length > 0,
+    roles.length > 0,
+    organizations.length > 0,
+  ];
+  const readinessScore = readinessChecks.filter(Boolean).length * 20;
+  const readinessLabel =
+    readinessScore >= 80 ? "Strong public profile" : readinessScore >= 60 ? "Good foundation" : "Early profile";
+  const strongestOrganization = organizations[0] || null;
 
   return (
     <main className="px-6 py-6">
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
-          <div className="h-56 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500" />
+          <div className="h-64 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500" />
 
           <div className="p-6">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div>
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+              <div className="flex-1">
                 <div className="-mt-20 flex h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
                   {getInitials(profile.full_name || "Asobu User")}
                 </div>
@@ -235,36 +260,99 @@ function PublicProfilePage() {
                   ))}
 
                   {sportLabels.map((sport) => (
-                    <span key={sport} className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                    <span
+                      key={sport}
+                      className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
+                    >
                       {sport}
                     </span>
                   ))}
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                {isOwnProfile ? (
-                  <Link to="/profile" className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800">
-                    Edit your profile
-                  </Link>
-                ) : (
-                  <Link to={`/messages?with=${profile.id}`} className="inline-flex rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800">
-                    Message on Asobu
-                  </Link>
-                )}
+              <div className="w-full max-w-[340px] rounded-[28px] bg-slate-50 p-5 xl:min-w-[320px]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Public profile strength</p>
+                    <p className="mt-1 text-sm text-slate-500">{readinessLabel}</p>
+                  </div>
+                  <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+                    {readinessScore}%
+                  </span>
+                </div>
 
-                <Link to="/discover" className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                  Back to discover
-                </Link>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Roles</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{roles.length}</p>
+                  </div>
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Sports</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{Math.max(sportLabels.length, 1)}</p>
+                  </div>
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Orgs</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{organizations.length}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {isOwnProfile ? (
+                    <Link
+                      to="/profile"
+                      className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                      Edit your profile
+                    </Link>
+                  ) : (
+                    <Link
+                      to={`/messages?with=${profile.id}`}
+                      className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                      Message on Asobu
+                    </Link>
+                  )}
+
+                  <Link
+                    to="/discover"
+                    className="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Back to discover
+                  </Link>
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 rounded-[28px] bg-slate-50 p-5">
-              <p className="text-sm font-semibold text-slate-900">Overview</p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">{identityContext}</p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                This public profile is the destination for discovery inside Asobu. It will grow into a richer sports identity with media, achievements, sporting history, and more trusted context over time.
-              </p>
+            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="rounded-[28px] bg-slate-50 p-5">
+                <p className="text-sm font-semibold text-slate-900">About this profile</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">{identityContext}</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  This profile is designed to become a trusted sports identity on Asobu, combining roles, organizations, media, achievements, and communication inside one place.
+                </p>
+              </div>
+
+              <div className="rounded-[28px] bg-slate-50 p-5">
+                <p className="text-sm font-semibold text-slate-900">Best fit on Asobu</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {openToLabels.length > 0 ? (
+                    openToLabels.map((item) => (
+                      <span key={item} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                        {item}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                      Building identity
+                    </span>
+                  )}
+                </div>
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  {strongestOrganization
+                    ? `${profile.full_name || "This member"} is currently most visible through ${strongestOrganization.name} on Asobu.`
+                    : "Independent profiles can still be discovered, messaged, and grow their sports identity on Asobu."}
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -272,18 +360,56 @@ function PublicProfilePage() {
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
             <section className="rounded-[32px] bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-2xl font-semibold text-slate-900">Overview</h2>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  Public identity
+                </span>
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-[24px] bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Primary role</p>
+                  <p className="mt-2 font-semibold text-slate-900">
+                    {primaryRole ? formatPersonRoleLabel(primaryRole) : "No role yet"}
+                  </p>
+                </div>
+                <div className="rounded-[24px] bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Main sport</p>
+                  <p className="mt-2 font-semibold text-slate-900">
+                    {getPrimarySportLabelFromValue(profile.main_sport)}
+                  </p>
+                </div>
+                <div className="rounded-[24px] bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Location</p>
+                  <p className="mt-2 font-semibold text-slate-900">
+                    {profile.location || "Not specified"}
+                  </p>
+                </div>
+                <div className="rounded-[24px] bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Organizations</p>
+                  <p className="mt-2 font-semibold text-slate-900">
+                    {organizations.length > 0 ? `${organizations.length} linked` : "Independent"}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[32px] bg-white p-6 shadow-sm">
               <h2 className="text-2xl font-semibold text-slate-900">Roles</h2>
               <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {roles.length > 0 ? (
                   roles.map((role) => (
                     <div key={role} className="rounded-[24px] bg-slate-50 p-4">
-                      <p className="text-sm text-slate-500">Role</p>
-                      <p className="mt-2 font-semibold text-slate-900">
-                        {formatPersonRoleLabel(role)}
-                      </p>
-                      <p className="mt-2 text-sm text-slate-500">
-                        {role === primaryRole ? "Main public sports identity" : "Secondary role inside the platform"}
-                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold text-slate-900">{formatPersonRoleLabel(role)}</p>
+                        {role === primaryRole && (
+                          <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm leading-7 text-slate-600">{ROLE_DESCRIPTIONS[role]}</p>
                     </div>
                   ))
                 ) : (
@@ -295,7 +421,13 @@ function PublicProfilePage() {
             </section>
 
             <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <h2 className="text-2xl font-semibold text-slate-900">Organizations</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-2xl font-semibold text-slate-900">Organizations</h2>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  {organizations.length}
+                </span>
+              </div>
+
               <div className="mt-5 space-y-3">
                 {organizations.length > 0 ? (
                   organizations.map((organization) => (
@@ -304,21 +436,35 @@ function PublicProfilePage() {
                       to={`/organizations/${organization.id}`}
                       className="flex items-start justify-between gap-4 rounded-[24px] border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
                     >
-                      <div>
-                        <h3 className="font-semibold text-slate-900">{organization.name}</h3>
-                        <p className="mt-1 text-sm text-slate-500 capitalize">
-                          {organization.organization_type || "organization"} · {organization.member_role}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {organization.location || "No location yet"}
-                        </p>
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+                          {organization.logo_url ? (
+                            <img
+                              src={organization.logo_url}
+                              alt={organization.name}
+                              className="h-full w-full rounded-2xl object-contain p-1.5"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
+                              {getInitials(organization.name)}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-slate-900">{organization.name}</h3>
+                          <p className="mt-1 text-sm text-slate-500 capitalize">
+                            {organization.organization_type || "organization"} · {organization.member_role}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {organization.location || "No location yet"}
+                          </p>
+                        </div>
                       </div>
 
-                      {organization.sport && (
-                        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                          {organization.sport}
-                        </span>
-                      )}
+                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                        {getPrimarySportLabelFromValue(organization.sport)}
+                      </span>
                     </Link>
                   ))
                 ) : (
@@ -332,24 +478,41 @@ function PublicProfilePage() {
 
           <div className="space-y-6">
             <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Media</h2>
+              <h2 className="text-xl font-semibold text-slate-900">Media spotlight</h2>
               <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-                Public media will appear here. Photos and short videos are a priority for the next evolution of profile identity on Asobu.
+                Photos and short videos will become a visible part of this profile. Public media should eventually help coaches, organizations, and scouts understand the person behind the name.
               </div>
             </section>
 
             <section className="rounded-[32px] bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Achievements</h2>
+              <h2 className="text-xl font-semibold text-slate-900">Achievements roadmap</h2>
               <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-                Achievement badges, coach recognition, and milestone progress will live here. This section is intentionally structured now so Asobu can grow into a more trusted sports identity platform.
+                Achievements, coach recognition, and milestone badges will live here. This section is intentionally structured now so the profile can become more trusted over time.
               </div>
             </section>
 
             <section className="rounded-[32px] bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Sporting history</h2>
               <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-                Sporting history will later track clubs, teams, milestones, and key development stages across the user journey.
+                Sporting history will later connect organizations, teams, milestones, and development stages into a more complete athletic journey.
               </div>
+            </section>
+
+            <section className="rounded-[32px] bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-slate-900">Connect on Asobu</h2>
+              <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
+                {isOwnProfile
+                  ? "Your public profile is now the destination people reach from Discover. Keep shaping it so messaging and opportunities happen in a stronger context."
+                  : "If this profile looks relevant to you, start the conversation directly on Asobu and keep the relationship inside the platform."}
+              </div>
+              {!isOwnProfile && (
+                <Link
+                  to={`/messages?with=${profile.id}`}
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Message this member
+                </Link>
+              )}
             </section>
           </div>
         </section>

@@ -671,7 +671,7 @@ function DiscoverPage() {
                           to={`/profiles/${item.id}`}
                           className="rounded-2xl bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800"
                         >
-                          Open profile
+                          View sports profile
                         </Link>
                       </div>
                     </div>
@@ -699,9 +699,9 @@ function DiscoverPage() {
         </section>
 
         <section className="rounded-[32px] bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">What comes next</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Profile depth on the way</h2>
           <div className="mt-4 flex flex-wrap gap-2">
-            {["Public profiles", "Media identity", "Achievements", "Chat entry points"].map(
+            {["Profile depth", "Media identity", "Achievements", "Sporting history"].map(
               (item) => (
                 <span
                   key={item}
