@@ -145,6 +145,9 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/profiles/:id" element={<PublicProfilePage />} />
+        <Route path="/organizations" element={<OrganizationsListPage />} />
+        <Route path="/organizations/:id" element={<OrganizationPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
