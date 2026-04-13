@@ -128,6 +128,8 @@ function FeedPage() {
   const [commentingPostId, setCommentingPostId] = useState<number | null>(null);
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [feedMessage, setFeedMessage] = useState('');
+  const [feedError, setFeedError] = useState('');
 
   useEffect(() => {
     async function loadFeedData() {
@@ -287,8 +289,13 @@ function FeedPage() {
     const validationError = validatePostImageFile(file);
     if (validationError) {
       console.error(validationError);
+      setFeedError(validationError);
+      setFeedMessage('');
       return;
     }
+
+    setFeedError('');
+    setFeedMessage('');
 
     revokeObjectUrl(postImagePreviewUrl);
     const previewUrl = URL.createObjectURL(file);
@@ -303,9 +310,21 @@ function FeedPage() {
   }
 
   async function handleCreatePost() {
-    if (!currentUserId || (!newPost.trim() && !postImageFile)) return;
+    if (!currentUserId) {
+      setFeedError('You need to be logged in to publish.');
+      setFeedMessage('');
+      return;
+    }
+
+    if (!newPost.trim() && !postImageFile) {
+      setFeedError('Write something or add an image before publishing.');
+      setFeedMessage('');
+      return;
+    }
 
     setCreating(true);
+    setFeedError('');
+    setFeedMessage('');
 
     let organizationId: number | null = null;
     let uploadedImageUrl: string | null = null;
@@ -328,6 +347,7 @@ function FeedPage() {
 
       if (error) {
         console.error("Error creating post:", error.message);
+        setFeedError(`Error: ${error.message}`);
         setCreating(false);
         return;
       }
@@ -335,20 +355,25 @@ function FeedPage() {
       setNewPost("");
       handleRemovePostImage();
       await loadPosts();
+      setFeedMessage('Post published.');
     } catch (error) {
-      console.error(
-        "Error creating post:",
-        error instanceof Error ? error.message : "Unknown error"
-      );
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("Error creating post:", message);
+      setFeedError(`Error: ${message}`);
     } finally {
       setCreating(false);
     }
   }
 
   async function handleDeletePost(postId: number) {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      setFeedError('You need to be logged in to delete a post.');
+      return;
+    }
 
     setDeletingPostId(postId);
+    setFeedError('');
+    setFeedMessage('');
 
     const { error } = await supabase
       .from("posts")
@@ -358,18 +383,24 @@ function FeedPage() {
 
     if (error) {
       console.error("Error deleting post:", error.message);
+      setFeedError(`Error: ${error.message}`);
       setDeletingPostId(null);
       return;
     }
 
     await Promise.all([loadPosts(), loadLikes(), loadComments()]);
+    setFeedMessage('Post deleted.');
     setDeletingPostId(null);
   }
 
   async function handleToggleLike(postId: number) {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      setFeedError('You need to be logged in to like posts.');
+      return;
+    }
 
     setLikingPostId(postId);
+    setFeedError('');
 
     const existingLike = likes.find(
       (like) => like.post_id === postId && like.user_id === currentUserId
@@ -384,6 +415,7 @@ function FeedPage() {
 
       if (error) {
         console.error("Error deleting like:", error.message);
+        setFeedError(`Error: ${error.message}`);
         setLikingPostId(null);
         return;
       }
@@ -395,6 +427,7 @@ function FeedPage() {
 
       if (error) {
         console.error("Error creating like:", error.message);
+        setFeedError(`Error: ${error.message}`);
         setLikingPostId(null);
         return;
       }
@@ -405,12 +438,19 @@ function FeedPage() {
   }
 
   async function handleAddComment(postId: number) {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      setFeedError('You need to be logged in to comment.');
+      return;
+    }
 
     const content = (commentDrafts[postId] || "").trim();
-    if (!content) return;
+    if (!content) {
+      setFeedError('Write a comment before sending it.');
+      return;
+    }
 
     setCommentingPostId(postId);
+    setFeedError('');
 
     const { error } = await supabase.from("post_comments").insert({
       post_id: postId,
@@ -420,6 +460,7 @@ function FeedPage() {
 
     if (error) {
       console.error("Error creating comment:", error.message);
+      setFeedError(`Error: ${error.message}`);
       setCommentingPostId(null);
       return;
     }
@@ -430,13 +471,18 @@ function FeedPage() {
     }));
 
     await loadComments();
+    setFeedMessage('Comment added.');
     setCommentingPostId(null);
   }
 
   async function handleDeleteComment(commentId: number) {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      setFeedError('You need to be logged in to delete comments.');
+      return;
+    }
 
     setDeletingCommentId(commentId);
+    setFeedError('');
 
     const { error } = await supabase
       .from("post_comments")
@@ -446,11 +492,13 @@ function FeedPage() {
 
     if (error) {
       console.error("Error deleting comment:", error.message);
+      setFeedError(`Error: ${error.message}`);
       setDeletingCommentId(null);
       return;
     }
 
     await loadComments();
+    setFeedMessage('Comment deleted.');
     setDeletingCommentId(null);
   }
 
@@ -510,6 +558,8 @@ function FeedPage() {
             commentingPostId={commentingPostId}
             deletingCommentId={deletingCommentId}
             currentUserId={currentUserId}
+            message={feedMessage}
+            error={feedError}
           />
           <SuggestionsCard manageableOrganizations={manageableOrganizations} />
         </div>

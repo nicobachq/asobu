@@ -39,7 +39,7 @@ function Navbar({ onLogout }: NavbarProps) {
           </nav>
         </div>
 
-        <button
+        <button type="button"
           onClick={onLogout}
           className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 sm:px-4"
         >

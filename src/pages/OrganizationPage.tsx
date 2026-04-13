@@ -1068,6 +1068,12 @@ function OrganizationPage() {
     setOrgPostImagePreviewUrl("");
   }
 
+  function focusCommentInput(postId: number) {
+    const input = document.getElementById(`organization-comment-input-${postId}`) as HTMLInputElement | null;
+    input?.focus();
+    input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   async function handleShareOrganization() {
     if (!organization) return;
 
@@ -1358,7 +1364,7 @@ function OrganizationPage() {
                     pending request
                   </span>
                 ) : (
-                  <button
+                  <button type="button"
                     onClick={handleJoinRequest}
                     disabled={joiningOrganization}
                     className={heroGhostButton + " disabled:opacity-60"}
@@ -1368,7 +1374,7 @@ function OrganizationPage() {
                 )}
 
                 {canEditOrganization && !editMode && (
-                  <button
+                  <button type="button"
                     onClick={() => {
                       setEditMode(true);
                       setPageError("");
@@ -1381,7 +1387,7 @@ function OrganizationPage() {
                 )}
 
                 {canSelfLeave && (
-                  <button
+                  <button type="button"
                     onClick={handleLeaveOrganization}
                     disabled={leavingOrganization}
                     className={heroGhostDangerButton + " disabled:opacity-60"}
@@ -1713,13 +1719,13 @@ function OrganizationPage() {
                 </div>
 
                 <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
-                  <button
+                  <button type="button"
                     onClick={handleCancelOrganizationEdit}
                     className={solidSecondaryButton}
                   >
                     Cancel
                   </button>
-                  <button
+                  <button type="button"
                     onClick={handleSaveOrganization}
                     disabled={savingOrganization || !orgName.trim()}
                     className={solidPrimaryButton}
@@ -1805,7 +1811,7 @@ function OrganizationPage() {
                   </select>
                 </div>
 
-                <button
+                <button type="button"
                   onClick={handleTransferOwnership}
                   disabled={transferringOwnership || !transferTargetUserId}
                   className={solidPrimaryButton}
@@ -1859,14 +1865,14 @@ function OrganizationPage() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <button
+                        <button type="button"
                           onClick={() => handleApproveRequest(request)}
                           disabled={processingRequestId === request.id}
                           className={smallPrimaryButton}
                         >
                           {processingRequestId === request.id ? "Working..." : "Approve"}
                         </button>
-                        <button
+                        <button type="button"
                           onClick={() => handleDeclineRequest(request.id)}
                           disabled={processingRequestId === request.id}
                           className={smallSecondaryButton}
@@ -1942,7 +1948,7 @@ function OrganizationPage() {
                     {(canPromote || canDemote || canRemove) && (
                       <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
                         {canPromote && (
-                          <button
+                          <button type="button"
                             onClick={() => handleChangeMemberRole(member.id, "admin")}
                             disabled={processingMemberId === member.id}
                             className={smallPrimaryButton}
@@ -1954,7 +1960,7 @@ function OrganizationPage() {
                         )}
 
                         {canDemote && (
-                          <button
+                          <button type="button"
                             onClick={() => handleChangeMemberRole(member.id, "member")}
                             disabled={processingMemberId === member.id}
                             className={smallSecondaryButton}
@@ -1966,7 +1972,7 @@ function OrganizationPage() {
                         )}
 
                         {canRemove && (
-                          <button
+                          <button type="button"
                             onClick={() => handleRemoveMember(member.id)}
                             disabled={processingMemberId === member.id}
                             className={smallDangerButton}
@@ -2083,7 +2089,7 @@ function OrganizationPage() {
               </div>
 
               <div className="mt-4 flex justify-end">
-                <button
+                <button type="button"
                   onClick={handleCreateOrganizationPost}
                   disabled={creatingPost || (!newPost.trim() && !orgPostImagePreviewUrl)}
                   className={solidPrimaryButton}
@@ -2152,7 +2158,7 @@ function OrganizationPage() {
                           Organization post
                         </span>
                         {isOwner && (
-                          <button
+                          <button type="button"
                             onClick={() => handleDeletePost(post.id)}
                             disabled={deletingPostId === post.id}
                             className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
@@ -2191,7 +2197,7 @@ function OrganizationPage() {
                     </div>
 
                     <div className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-100 pt-4">
-                      <button
+                      <button type="button"
                         onClick={() => handleToggleLike(post.id)}
                         disabled={likingPostId === post.id}
                         className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
@@ -2202,10 +2208,14 @@ function OrganizationPage() {
                           ? "Unlike"
                           : "Like"}
                       </button>
-                      <button className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
+                      <button
+                        type="button"
+                        onClick={() => focusCommentInput(post.id)}
+                        className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                      >
                         Comment
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => void handleSharePost(post)}
                         className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
                       >
@@ -2233,7 +2243,7 @@ function OrganizationPage() {
                               </div>
 
                               {canDeleteComment && (
-                                <button
+                                <button type="button"
                                   onClick={() => handleDeleteComment(comment.id)}
                                   disabled={deletingCommentId === comment.id}
                                   className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
@@ -2261,7 +2271,7 @@ function OrganizationPage() {
                           placeholder="Write a comment..."
                           className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
                         />
-                        <button
+                        <button type="button"
                           onClick={() => handleAddComment(post.id)}
                           disabled={
                             commentingPostId === post.id ||

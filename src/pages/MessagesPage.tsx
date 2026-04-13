@@ -463,7 +463,7 @@ function MessagesPage() {
                       placeholder="Write a message..."
                       className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
                     />
-                    <button
+                    <button type="button"
                       onClick={handleSendMessage}
                       disabled={sending || !draft.trim()}
                       className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"

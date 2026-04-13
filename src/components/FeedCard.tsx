@@ -73,6 +73,8 @@ type FeedCardProps = {
   commentingPostId: number | null;
   deletingCommentId: number | null;
   currentUserId: string | null;
+  message: string;
+  error: string;
 };
 
 function getInitials(name: string) {
@@ -113,6 +115,8 @@ function FeedCard({
   commentingPostId,
   deletingCommentId,
   currentUserId,
+  message,
+  error,
 }: FeedCardProps) {
   const [shareFeedback, setShareFeedback] = useState("");
 
@@ -124,6 +128,12 @@ function FeedCard({
 
   const canPublish = Boolean(newPost.trim() || postImagePreviewUrl);
   const composerExternalMedia = getExternalMediaPreview(newPost);
+
+  function focusCommentInput(postId: number) {
+    const input = document.getElementById(`feed-comment-input-${postId}`) as HTMLInputElement | null;
+    input?.focus();
+    input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   async function handleSharePost(post: Post) {
     const organization = post.organizations;
@@ -278,6 +288,7 @@ function FeedCard({
             </div>
 
             <button
+              type="button"
               onClick={onCreatePost}
               disabled={creating || !canPublish}
               className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
@@ -286,6 +297,8 @@ function FeedCard({
             </button>
           </div>
 
+          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+          {!error && message && <p className="mt-4 text-sm text-emerald-600">{message}</p>}
           {shareFeedback && <p className="mt-4 text-sm text-emerald-600">{shareFeedback}</p>}
         </div>
       </section>
@@ -341,7 +354,7 @@ function FeedCard({
                       </span>
                     )}
                     {isOwner && (
-                      <button
+                      <button type="button"
                         onClick={() => onDeletePost(post.id)}
                         disabled={deletingPostId === post.id}
                         className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
@@ -376,17 +389,21 @@ function FeedCard({
                 </div>
 
                 <div className="mt-4 grid grid-cols-3 gap-3">
-                  <button
+                  <button type="button"
                     onClick={() => onToggleLike(post.id)}
                     disabled={likingPostId === post.id}
                     className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
                   >
                     {likingPostId === post.id ? "..." : likedByMe ? "Unlike" : "Like"}
                   </button>
-                  <button className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => focusCommentInput(post.id)}
+                    className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                  >
                     Comment
                   </button>
-                  <button
+                  <button type="button"
                     onClick={() => void handleSharePost(post)}
                     className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
                   >
@@ -407,7 +424,7 @@ function FeedCard({
                             <p className="mt-1 text-sm text-slate-700">{comment.content}</p>
                           </div>
                           {canDeleteComment && (
-                            <button
+                            <button type="button"
                               onClick={() => onDeleteComment(comment.id)}
                               disabled={deletingCommentId === comment.id}
                               className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
@@ -422,6 +439,7 @@ function FeedCard({
 
                   <div className="flex gap-3">
                     <input
+                      id={`feed-comment-input-${post.id}`}
                       type="text"
                       value={commentDrafts[post.id] || ""}
                       onChange={(e) =>
@@ -433,7 +451,7 @@ function FeedCard({
                       placeholder="Write a comment..."
                       className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
                     />
-                    <button
+                    <button type="button"
                       onClick={() => onAddComment(post.id)}
                       disabled={commentingPostId === post.id || !(commentDrafts[post.id] || "").trim()}
                       className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"

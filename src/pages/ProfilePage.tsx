@@ -286,6 +286,40 @@ function ProfilePage() {
     [allOrganizations, historyForm.selectedOrganizationId]
   );
 
+  const historyValidationHint = useMemo(() => {
+    if (!(historyForm.sport || '').trim()) {
+      return 'Choose the sport for this phase.';
+    }
+
+    if (!historyForm.positionKey) {
+      return 'Choose the position or role for this phase.';
+    }
+
+    if (selectedHistoryOrganization) {
+      return '';
+    }
+
+    if (historyForm.createOrganizationInline) {
+      if (!historyForm.inlineOrganizationName.trim()) {
+        return 'Name the organization you want to create.';
+      }
+      return '';
+    }
+
+    if (historyForm.organizationSearch.trim()) {
+      return 'Select one of the matching organizations, or create it inline below.';
+    }
+
+    return 'Search and select an organization, or create it inline below.';
+  }, [
+    historyForm.createOrganizationInline,
+    historyForm.inlineOrganizationName,
+    historyForm.organizationSearch,
+    historyForm.positionKey,
+    historyForm.sport,
+    selectedHistoryOrganization,
+  ]);
+
   const activeSportValue = mainSport || profile?.main_sport;
   const activeSkillTemplate = useMemo(
     () => resolveSkillTemplate(activeSportValue),
@@ -727,24 +761,55 @@ function ProfilePage() {
     });
   }
 
-  function resetHistoryForm() {
+  function resetHistoryForm(options?: { preserveMessage?: boolean }) {
     setEditingHistoryId(null);
     setHistoryForm({
       ...EMPTY_HISTORY_FORM,
       sport: profile?.main_sport || mainSport || '',
     });
-    setHistoryMessage('');
+    if (!options?.preserveMessage) {
+      setHistoryMessage('');
+    }
   }
 
   async function handleSaveHistory(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!profileId || !(historyForm.sport || '').trim() || !historyForm.positionKey) return;
+    if (!profileId) {
+      setHistoryMessage('Your profile is still loading. Please try again in a moment.');
+      return;
+    }
+
+    if (!(historyForm.sport || '').trim()) {
+      setHistoryMessage('Choose the sport for this sporting phase.');
+      return;
+    }
+
+    if (!historyForm.positionKey) {
+      setHistoryMessage('Choose the position or role for this sporting phase.');
+      return;
+    }
 
     setSavingHistory(true);
     setHistoryMessage('');
 
-    let linkedOrganization = selectedHistoryOrganization;
+    let linkedOrganization =
+      selectedHistoryOrganization ||
+      allOrganizations.find((organization) => {
+        const query = historyForm.organizationSearch.trim().toLowerCase();
+        if (!query) return false;
+        return organization.name.trim().toLowerCase() === query;
+      }) ||
+      (filteredHistoryOrganizations.length === 1 ? filteredHistoryOrganizations[0] : null);
+
+    if (linkedOrganization && linkedOrganization.id !== historyForm.selectedOrganizationId) {
+      setHistoryForm((current) => ({
+        ...current,
+        selectedOrganizationId: linkedOrganization?.id || null,
+        organizationSearch: linkedOrganization?.name || current.organizationSearch,
+        createOrganizationInline: false,
+      }));
+    }
 
     if (!linkedOrganization && historyForm.createOrganizationInline) {
       if (!historyForm.inlineOrganizationName.trim()) {
@@ -825,7 +890,7 @@ function ProfilePage() {
     await loadSportingHistory(profileId);
     setHistoryMessage(editingHistoryId ? 'History entry updated.' : 'History entry added.');
     setSavingHistory(false);
-    resetHistoryForm();
+    resetHistoryForm({ preserveMessage: true });
   }
 
   async function handleDeleteHistory(entryId: number) {
@@ -1520,7 +1585,7 @@ function ProfilePage() {
                       {editingHistoryId && (
                         <button
                           type="button"
-                          onClick={resetHistoryForm}
+                          onClick={() => resetHistoryForm()}
                           className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
                         >
                           Cancel edit
@@ -1528,6 +1593,9 @@ function ProfilePage() {
                       )}
                     </div>
 
+                    {historyValidationHint && !historyMessage && (
+                      <p className="lg:col-span-2 text-sm text-slate-500">{historyValidationHint}</p>
+                    )}
                     {historyMessage && <p className="lg:col-span-2 text-sm text-slate-600">{historyMessage}</p>}
                   </form>
 
