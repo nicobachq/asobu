@@ -118,3 +118,30 @@ export function getSportLabelsFromValue(value: string | null | undefined): strin
 export function getPrimarySportLabelFromValue(value: string | null | undefined) {
   return getSportLabelsFromValue(value)[0] || 'Not specified';
 }
+
+
+export const MAX_PROFILE_SPORTS = 3;
+
+export function getSelectedSportLabelsFromValue(value: string | null | undefined): string[] {
+  return getSportLabelsFromValue(value).slice(0, MAX_PROFILE_SPORTS);
+}
+
+export function buildProfileSportsValue(
+  selectedLabels: string[],
+  primaryLabel?: string | null
+) {
+  const validLabels = new Set(SPORT_REGISTRATION_OPTIONS.map((option) => option.label));
+  const uniqueLabels = Array.from(
+    new Set(
+      selectedLabels
+        .map((label) => label.trim())
+        .filter(Boolean)
+        .filter((label) => validLabels.has(label))
+    )
+  ).slice(0, MAX_PROFILE_SPORTS);
+
+  if (uniqueLabels.length === 0) return '';
+
+  const resolvedPrimary = primaryLabel && uniqueLabels.includes(primaryLabel) ? primaryLabel : uniqueLabels[0];
+  return [resolvedPrimary, ...uniqueLabels.filter((label) => label !== resolvedPrimary)].join(', ');
+}
