@@ -45,6 +45,14 @@ export const ORGANIZATION_REGISTRATION_OPTIONS: {
   },
 ];
 
+export const ORGANIZATION_TYPE_FILTER_OPTIONS = [
+  { value: "all", label: "All types" },
+  ...ORGANIZATION_REGISTRATION_OPTIONS.map((option) => ({
+    value: option.value,
+    label: option.label,
+  })),
+] as const;
+
 export function normalizePersonRole(value: string | null | undefined): PersonRole | null {
   const normalized = (value || "").trim().toLowerCase();
 
@@ -63,8 +71,60 @@ export function normalizePersonRole(value: string | null | undefined): PersonRol
   return null;
 }
 
+export function normalizeOrganizationType(
+  value: string | null | undefined
+): OrganizationRegistrationType | null {
+  const normalized = (value || "").trim().toLowerCase();
+
+  if (["team", "squad"].includes(normalized)) return "team";
+  if (["federation", "association", "governing body"].includes(normalized)) return "federation";
+  if (["club"].includes(normalized)) return "club";
+  if (["entity", "academy", "brand", "agency", "school", "training center"].includes(normalized)) {
+    return "entity";
+  }
+  if (["community", "group"].includes(normalized)) return "community";
+
+  return null;
+}
+
 export function formatPersonRoleLabel(role: PersonRole) {
   return PERSON_ROLE_OPTIONS.find((option) => option.value === role)?.label || role;
+}
+
+export function formatOrganizationTypeLabel(value: string | null | undefined) {
+  const normalized = normalizeOrganizationType(value);
+
+  if (normalized) {
+    return (
+      ORGANIZATION_REGISTRATION_OPTIONS.find((option) => option.value === normalized)?.label ||
+      normalized
+    );
+  }
+
+  const fallback = (value || "organization").trim();
+  if (!fallback) return "Organization";
+
+  return fallback
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function getOrganizationTypeDescription(value: string | null | undefined) {
+  const normalized = normalizeOrganizationType(value);
+
+  if (!normalized) {
+    return "Asobu uses organizations as the umbrella layer for teams, clubs, federations, entities, and communities.";
+  }
+
+  return (
+    ORGANIZATION_REGISTRATION_OPTIONS.find((option) => option.value === normalized)?.description ||
+    "Asobu uses organizations as the umbrella layer for teams, clubs, federations, entities, and communities."
+  );
+}
+
+export function getOrganizationTypeAudienceLabel() {
+  return "Teams, clubs, federations, entities, and communities";
 }
 
 export function buildRoleSelectionMap(roles: PersonRole[]) {

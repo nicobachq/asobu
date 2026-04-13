@@ -3,6 +3,13 @@ import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { getFileFromInputEvent, revokeObjectUrl, uploadPostImage, validatePostImageFile } from "../lib/media";
 import ProfileCard from "../components/ProfileCard";
+import {
+  formatOrganizationTypeLabel,
+  getOrganizationTypeAudienceLabel,
+  getOrganizationTypeDescription,
+  normalizeOrganizationType,
+  ORGANIZATION_REGISTRATION_OPTIONS,
+} from "../lib/identity";
 
 type DbProfile = {
   id: string;
@@ -422,7 +429,7 @@ function OrganizationPage() {
     const typedOrganization = organizationData as Organization;
     setOrganization(typedOrganization);
     setOrgName(typedOrganization.name || "");
-    setOrgType(typedOrganization.organization_type || "community");
+    setOrgType(normalizeOrganizationType(typedOrganization.organization_type) || "community");
     setOrgSport(typedOrganization.sport || "");
     setOrgLocation(typedOrganization.location || "");
     setOrgDescription(typedOrganization.description || "");
@@ -620,7 +627,7 @@ function OrganizationPage() {
     safeRevokeObjectUrl(coverPreviewUrl);
 
     setOrgName(organization.name || "");
-    setOrgType(organization.organization_type || "community");
+    setOrgType(normalizeOrganizationType(organization.organization_type) || "community");
     setOrgSport(organization.sport || "");
     setOrgLocation(organization.location || "");
     setOrgDescription(organization.description || "");
@@ -1247,8 +1254,8 @@ function OrganizationPage() {
 
   if (loading) {
     return (
-      <main className="px-6 py-6">
-        <div className="mx-auto max-w-[1500px] rounded-[32px] bg-white p-6 shadow-sm">
+      <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
+        <div className="mx-auto max-w-[1500px] rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           Loading organization...
         </div>
       </main>
@@ -1257,8 +1264,8 @@ function OrganizationPage() {
 
   if (!organization) {
     return (
-      <main className="px-6 py-6">
-        <div className="mx-auto max-w-5xl rounded-[32px] bg-white p-6 shadow-sm">
+      <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
+        <div className="mx-auto max-w-5xl rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <h1 className="text-2xl font-bold text-slate-900">Organization page</h1>
           <p className="mt-3 text-sm text-slate-600">
             {pageError || "Organization not found."}
@@ -1277,7 +1284,7 @@ function OrganizationPage() {
   }
 
   return (
-    <main className="mx-auto grid max-w-[1500px] grid-cols-1 gap-6 px-6 py-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
+    <main className="mx-auto grid max-w-[1500px] grid-cols-1 gap-4 px-3 py-3 sm:gap-6 sm:px-4 sm:py-4 lg:px-6 lg:py-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
       <div>
         <ProfileCard profile={profile} />
       </div>
@@ -1351,30 +1358,30 @@ function OrganizationPage() {
               </div>
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 p-6">
+            <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div className="flex min-w-0 items-end gap-4">
-                  <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-[28px] border border-white/20 bg-white shadow-xl">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[24px] border border-white/20 bg-white shadow-xl sm:h-28 sm:w-28 sm:rounded-[28px]">
                     {organization.logo_url ? (
                       <img
                         src={organization.logo_url}
                         alt={organization.name}
-                        className="h-full w-full rounded-[24px] object-contain p-2.5"
+                        className="h-full w-full rounded-[20px] object-contain p-2 sm:rounded-[24px] sm:p-2.5"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center rounded-[24px] bg-slate-900 text-2xl font-semibold text-white">
+                      <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-slate-900 text-lg font-semibold text-white sm:rounded-[24px] sm:text-2xl">
                         {getInitials(organization.name)}
                       </div>
                     )}
                   </div>
 
                   <div className="min-w-0">
-                    <h1 className="max-w-3xl text-4xl font-bold leading-tight text-white md:text-5xl">
+                    <h1 className="max-w-3xl text-2xl font-bold leading-tight text-white sm:text-4xl md:text-5xl">
                       {organization.name}
                     </h1>
                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/85">
                       <span className="font-medium">
-                        {organization.organization_type}
+                        {formatOrganizationTypeLabel(organization.organization_type)}
                       </span>
                       <span>•</span>
                       <span>{organization.location || "No location yet"}</span>
@@ -1406,13 +1413,16 @@ function OrganizationPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="grid grid-cols-1 gap-4 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div>
               <p className="text-base leading-8 text-slate-700">
                 {organization.description || "No description yet."}
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
+                <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+                  {formatOrganizationTypeLabel(organization.organization_type)}
+                </span>
                 {organization.sport && (
                   <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
                     {organization.sport}
@@ -1430,6 +1440,10 @@ function OrganizationPage() {
                   </span>
                 ))}
               </div>
+
+              <p className="mt-4 text-sm leading-7 text-slate-500">
+                On Asobu, organization is the umbrella for {getOrganizationTypeAudienceLabel().toLowerCase()}. This page is a {formatOrganizationTypeLabel(organization.organization_type).toLowerCase()} profile.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -1442,7 +1456,7 @@ function OrganizationPage() {
               <div className="rounded-[24px] bg-slate-50 p-4">
                 <p className="text-sm text-slate-500">Type</p>
                 <p className="mt-2 font-semibold capitalize text-slate-900">
-                  {organization.organization_type}
+                  {formatOrganizationTypeLabel(organization.organization_type)}
                 </p>
               </div>
               <div className="rounded-[24px] bg-slate-50 p-4">
@@ -1475,7 +1489,7 @@ function OrganizationPage() {
         )}
 
         {canEditOrganization && (
-          <section className="rounded-[32px] bg-white p-6 shadow-sm">
+          <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-slate-900">
@@ -1514,13 +1528,15 @@ function OrganizationPage() {
                     onChange={(e) => setOrgType(e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
                   >
-                    <option value="community">Community</option>
-                    <option value="club">Club</option>
-                    <option value="team">Team</option>
-                    <option value="academy">Academy</option>
-                    <option value="federation">Federation</option>
-                    <option value="brand">Brand</option>
+                    {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {getOrganizationTypeDescription(orgType)}
+                  </p>
                 </div>
 
                 <div>
@@ -1675,7 +1691,7 @@ function OrganizationPage() {
                 <div className="rounded-[24px] bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">Type</p>
                   <p className="mt-2 font-medium text-slate-900">
-                    {organization.organization_type}
+                    {formatOrganizationTypeLabel(organization.organization_type)}
                   </p>
                 </div>
                 <div className="rounded-[24px] bg-slate-50 p-4">
@@ -1702,7 +1718,7 @@ function OrganizationPage() {
         )}
 
         {canManageMembers && (
-          <section className="rounded-[32px] bg-white p-6 shadow-sm">
+          <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-slate-900">
@@ -1756,7 +1772,7 @@ function OrganizationPage() {
         )}
 
         {canManageOrganization && (
-          <section className="rounded-[32px] bg-white p-6 shadow-sm">
+          <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-slate-900">
@@ -1820,7 +1836,7 @@ function OrganizationPage() {
           </section>
         )}
 
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
+        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-2xl font-semibold text-slate-900">Members</h2>
@@ -1923,7 +1939,7 @@ function OrganizationPage() {
           )}
         </section>
 
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
+        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-2xl font-semibold text-slate-900">
@@ -1960,7 +1976,7 @@ function OrganizationPage() {
                     Post as {organization.name}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {organization.organization_type}
+                    {formatOrganizationTypeLabel(organization.organization_type)}
                   </p>
                 </div>
               </div>
@@ -2065,8 +2081,7 @@ function OrganizationPage() {
                             {organizationInfo?.name || organization.name}
                           </h3>
                           <p className="mt-1 text-sm text-slate-500">
-                            {organizationInfo?.organization_type ||
-                              organization.organization_type}{" "}
+                            {formatOrganizationTypeLabel(organizationInfo?.organization_type || organization.organization_type)}{" "}
                             · posted by {author?.full_name || "member"} ·{" "}
                             {post.created_at
                               ? new Date(post.created_at).toLocaleString()
@@ -2201,7 +2216,7 @@ function OrganizationPage() {
       </div>
 
       <div className="space-y-6">
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
+        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <h2 className="text-xl font-semibold text-slate-900">Quick overview</h2>
           <p className="mt-3 text-sm text-slate-600">{sidebarStatusLabel}</p>
 
@@ -2227,7 +2242,7 @@ function OrganizationPage() {
           <div className="mt-5 space-y-3 text-sm text-slate-700">
             <p>
               <span className="font-semibold">Organization type:</span>{" "}
-              {organization.organization_type}
+              {formatOrganizationTypeLabel(organization.organization_type)}
             </p>
             <p>
               <span className="font-semibold">Sport:</span>{" "}
@@ -2240,7 +2255,7 @@ function OrganizationPage() {
           </div>
         </section>
 
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
+        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <h2 className="text-xl font-semibold text-slate-900">Branding</h2>
           <div className="mt-5 space-y-4">
             <div>
@@ -2278,7 +2293,7 @@ function OrganizationPage() {
           </div>
         </section>
 
-        <section className="rounded-[32px] bg-white p-6 shadow-sm">
+        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <h2 className="text-xl font-semibold text-slate-900">Management</h2>
 
           <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">

@@ -4,8 +4,10 @@ import { supabase } from "../lib/supabase";
 import {
   formatPersonRoleLabel,
   formatRoleSummary,
+  formatOrganizationTypeLabel,
   getIdentityContextLabel,
   getOpenToLabelsForRoles,
+  getOrganizationTypeAudienceLabel,
   getUniquePersonRoles,
   normalizePersonRole,
   type PersonRole,
@@ -391,19 +393,19 @@ function DiscoverPage() {
   const resultCount = activeTab === "organizations" ? filteredOrganizations.length : filteredProfiles.length;
 
   return (
-    <main className="px-6 py-6">
+    <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
-          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-6 py-8 text-white">
+        <section className="overflow-hidden rounded-[28px] bg-white shadow-sm sm:rounded-[32px]">
+          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-4 py-6 text-white sm:px-6 sm:py-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Discover</p>
-                <h1 className="mt-2 text-3xl font-bold lg:text-4xl">Explore the sports network</h1>
+                <h1 className="mt-2 text-2xl font-bold sm:text-3xl lg:text-4xl">Explore the sports network</h1>
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-white/75">
-                  Search players, coaches, and organizations through a cleaner identity-first Asobu experience.
+                  Search players, coaches, and organizations through a cleaner identity-first Asobu experience. Organizations include teams, clubs, federations, entities, and communities.
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 text-center backdrop-blur">
                   <p className="text-xs uppercase tracking-[0.18em] text-white/60">Players</p>
                   <p className="mt-2 text-3xl font-bold">{tabCounts.players}</p>
@@ -425,7 +427,7 @@ function DiscoverPage() {
           <ProfileCard profile={profile} />
 
           <div className="space-y-6">
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
+            <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 {[
                   { key: "players", label: "Players", count: tabCounts.players },
@@ -467,7 +469,7 @@ function DiscoverPage() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder={`Search ${activeTab}...`}
+                    placeholder={activeTab === "organizations" ? "Search organizations, types, sports, or locations..." : `Search ${activeTab}...`}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
                   />
                 </div>
@@ -491,7 +493,14 @@ function DiscoverPage() {
               </div>
             </section>
 
-            <section className="rounded-[32px] bg-white p-6 shadow-sm">
+            <section className="rounded-[28px] border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-600 shadow-sm sm:p-5">
+              <p className="font-semibold text-slate-900">Organization structure on Asobu</p>
+              <p className="mt-2">
+                In Asobu, organization is the umbrella term for {getOrganizationTypeAudienceLabel().toLowerCase()}. That keeps discovery simple while still showing each type clearly on cards and pages.
+              </p>
+            </section>
+
+            <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
               {loading ? (
                 <p className="text-sm text-slate-500">Loading discover results...</p>
               ) : resultCount === 0 ? (
@@ -507,7 +516,7 @@ function DiscoverPage() {
                     <Link
                       key={organization.id}
                       to={`/organizations/${organization.id}`}
-                      className="overflow-hidden rounded-[28px] bg-slate-50 transition hover:bg-slate-100"
+                      className="overflow-hidden rounded-[24px] bg-slate-50 transition hover:bg-slate-100 sm:rounded-[28px]"
                     >
                       <div
                         className="h-32 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
@@ -521,10 +530,10 @@ function DiscoverPage() {
                             : undefined
                         }
                       />
-                      <div className="p-5">
-                        <div className="-mt-12 flex items-start justify-between gap-3">
+                      <div className="p-4 sm:p-5">
+                        <div className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-start sm:justify-between">
                           <div className="flex min-w-0 items-start gap-3">
-                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-white shadow-sm">
+                            <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-[24px] border-4 border-white bg-white shadow-sm sm:h-20 sm:w-20 sm:rounded-3xl">
                               {organization.logo_url ? (
                                 <img
                                   src={organization.logo_url}
@@ -538,13 +547,16 @@ function DiscoverPage() {
                               )}
                             </div>
                             <div className="min-w-0 pt-10">
-                              <h2 className="truncate text-xl font-bold text-slate-900">{organization.name}</h2>
-                              <p className="mt-1 text-sm uppercase tracking-[0.16em] text-slate-400">
-                                {organization.organization_type || "organization"}
+                              <h2 className="truncate text-lg font-bold text-slate-900 sm:text-xl">{organization.name}</h2>
+                              <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">
+                                Organization type
+                              </p>
+                              <p className="mt-1 text-sm font-medium text-slate-700">
+                                {formatOrganizationTypeLabel(organization.organization_type)}
                               </p>
                             </div>
                           </div>
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                          <span className="self-start rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
                             {memberCountsByOrg[organization.id] || 0} members
                           </span>
                         </div>
@@ -553,7 +565,7 @@ function DiscoverPage() {
                           <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
                             {getPrimarySportLabelFromValue(organization.sport)}
                           </span>
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                          <span className="self-start rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
                             Open page
                           </span>
                         </div>
@@ -576,7 +588,7 @@ function DiscoverPage() {
                     return (
                       <article key={item.id} className="overflow-hidden rounded-[28px] bg-white ring-1 ring-slate-200 transition hover:ring-slate-300">
                         <div className="h-24 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700" />
-                        <div className="p-5">
+                        <div className="p-4 sm:p-5">
                           <div className="-mt-12 flex items-start justify-between gap-4">
                             <div className="flex items-start gap-4">
                               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-slate-900 text-lg font-semibold text-white shadow-sm">
@@ -649,19 +661,19 @@ function DiscoverPage() {
           </div>
 
           <aside className="space-y-6">
-            <section className="rounded-[32px] bg-white p-5 shadow-sm">
+            <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-5">
               <h2 className="text-lg font-semibold text-slate-900">Discover logic</h2>
               <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
                 <p>
                   People can now appear with clearer multi-role identity. A coach who is also a player is no longer forced into one flat label.
                 </p>
                 <p>
-                  Organizations stay top-level entities, while teams, federations, and communities still remain connected to real human owners.
+                  Organizations are the umbrella layer for {getOrganizationTypeAudienceLabel().toLowerCase()}, while still remaining connected to real human owners.
                 </p>
               </div>
             </section>
 
-            <section className="rounded-[32px] bg-slate-900 p-5 text-white shadow-sm">
+            <section className="rounded-[28px] bg-slate-900 p-4 text-white shadow-sm sm:rounded-[32px] sm:p-5">
               <h2 className="text-lg font-semibold">Profile depth on the way</h2>
               <div className="mt-4 flex flex-wrap gap-2">
                 {["Profile depth", "Media identity", "Achievements", "Sporting history"].map((item) => (

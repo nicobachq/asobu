@@ -618,7 +618,7 @@ function PublicProfilePage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-6 pb-20">
+      <div className="mx-auto max-w-5xl px-3 pb-12 sm:px-4 sm:pb-16 lg:px-6 lg:pb-20">
         <section className="mt-10">
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Media</h2>

@@ -455,7 +455,7 @@ function FeedPage() {
   }
 
   return (
-    <main className="px-6 py-6">
+    <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
       <div className="mx-auto max-w-7xl space-y-6">
         <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
           <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-6 py-8 text-white">

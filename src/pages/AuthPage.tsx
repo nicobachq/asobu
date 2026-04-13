@@ -4,6 +4,7 @@ import {
   formatPersonRoleLabel,
   formatRoleSummary,
   getIdentityContextLabel,
+  getOrganizationTypeAudienceLabel,
   ORGANIZATION_REGISTRATION_OPTIONS,
   PERSON_ROLE_OPTIONS,
   type OrganizationRegistrationType,
@@ -322,8 +323,7 @@ function AuthPage() {
                   ) : (
                     <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
                       <p>
-                        Teams and federations are top-level registration paths, but every
-                        organization still has a real human owner behind it.
+                        On Asobu, organization is the umbrella for {getOrganizationTypeAudienceLabel().toLowerCase()}, but every organization still has a real human owner behind it.
                       </p>
                       <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
                         <p className="font-semibold text-slate-900">
