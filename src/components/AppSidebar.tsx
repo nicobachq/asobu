@@ -111,7 +111,7 @@ function AppSidebar({ onLogout }: AppSidebarProps) {
         <div className="rounded-[28px] border border-slate-200/80 bg-white/92 p-4 shadow-[0_16px_34px_rgba(15,23,42,.06)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Workspace</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Build your sports identity, discover the right ecosystem, and keep your activity visible.
+            Identity, organizations, and activity in one place.
           </p>
         </div>
       </div>

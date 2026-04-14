@@ -7,7 +7,6 @@ import EventCard from "../components/EventCard";
 import ExternalMediaCard from "../components/ExternalMediaCard";
 import {
   formatOrganizationTypeLabel,
-  getOrganizationTypeAudienceLabel,
   getOrganizationTypeDescription,
   normalizeOrganizationType,
   ORGANIZATION_REGISTRATION_OPTIONS,
@@ -1619,9 +1618,6 @@ function OrganizationPage() {
                 ))}
               </div>
 
-              <p className="mt-4 text-sm leading-7 text-slate-500">
-                On Asobu, organization is the umbrella for {getOrganizationTypeAudienceLabel().toLowerCase()}. This page is a {formatOrganizationTypeLabel(organization.organization_type).toLowerCase()} profile.
-              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

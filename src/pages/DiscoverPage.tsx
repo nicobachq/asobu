@@ -404,7 +404,7 @@ function DiscoverPage() {
                 Find the people and organizations that define your sporting network.
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-                Discover is Asobu’s identity-first search layer. Explore players, coaches, and every kind of organization through sport, role, and context.
+                Search people and organizations across sport, role, and context.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:min-w-[460px]">
@@ -495,13 +495,6 @@ function DiscoverPage() {
                   </select>
                 </div>
               </div>
-            </section>
-
-            <section className="app-card-subtle rounded-[28px] p-4 text-sm leading-7 text-slate-600 sm:p-5">
-              <p className="font-semibold text-slate-900">Organization structure on Asobu</p>
-              <p className="mt-2">
-                In Asobu, organization is the umbrella term for {getOrganizationTypeAudienceLabel().toLowerCase()}. That keeps discovery simple while still showing each type clearly on cards and pages.
-              </p>
             </section>
 
             <section className="app-card rounded-[32px] p-4 sm:p-6">

@@ -641,29 +641,10 @@ function CalendarPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 py-4 sm:px-4 sm:py-6 lg:px-6">
-      <section className="overflow-hidden rounded-[28px] bg-slate-900 text-white shadow-sm sm:rounded-[36px]">
-        <div className="grid gap-8 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.9fr)] lg:px-10">
-          <div className="space-y-4">
-            <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">
-              Calendar UX revision v2
-            </span>
-            <div className="space-y-3">
-              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                Create, edit, and place events more naturally.
-              </h1>
-              <p className="max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                Asobu now keeps the month view and list view, adds proper event editing, and makes location entry smarter when Google Places is available.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">What changed in this pass</p>
-            <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-200">
-              <li>• Existing events can now be edited instead of only created or deleted.</li>
-              <li>• Location can use Google Places autocomplete when a Maps API key is configured.</li>
-              <li>• Manual location typing still works, and end time stays optional.</li>
-            </ul>
+      <section className="app-card rounded-[32px] px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Calendar</h1>
           </div>
         </div>
       </section>
@@ -671,12 +652,7 @@ function CalendarPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
         <section ref={formSectionRef} className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-slate-900">{isEditing ? 'Edit event' : 'Create an event'}</h2>
-            <p className="text-sm leading-6 text-slate-600">
-              {isEditing
-                ? 'Update the event details, time, place, opponent, and result without recreating it from scratch.'
-                : 'The form adapts better to real sports activity. Matches can search opponent organizations inside Asobu, while independent amateur cases still work with a manual fallback.'}
-            </p>
+            <h2 className="text-2xl font-semibold text-slate-900">{isEditing ? 'Edit event' : 'Create event'}</h2>
           </div>
 
           <form className="mt-6 space-y-5" onSubmit={handleCreateEvent}>
@@ -697,9 +673,6 @@ function CalendarPage() {
                       }`}
                     >
                       <span className="block font-semibold">{option.label}</span>
-                      <span className={`mt-1 block text-xs leading-5 ${active ? 'text-slate-200' : 'text-slate-500'}`}>
-                        {option.description}
-                      </span>
                     </button>
                   );
                 })}
@@ -715,9 +688,6 @@ function CalendarPage() {
                 placeholder={form.eventType === 'match' ? 'Optional. It can be generated from the selected teams.' : 'Optional but recommended.'}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
               />
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Leave this blank and Asobu will generate a sensible title from the event type and organizations.
-              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -750,9 +720,6 @@ function CalendarPage() {
                     </option>
                   ))}
                 </select>
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  {EVENT_VISIBILITY_OPTIONS.find((option) => option.value === form.visibility)?.description}
-                </p>
               </div>
             </div>
 
@@ -1044,9 +1011,7 @@ function CalendarPage() {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
                 <h2 className="text-2xl font-semibold text-slate-900">Calendar</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Use the month grid for rhythm and the list for detail. Both are reading the same event data underneath.
-                </p>
+
               </div>
 
               <div className="flex flex-wrap gap-2 rounded-full bg-slate-100 p-1">
@@ -1123,7 +1088,6 @@ function CalendarPage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-xl font-semibold text-slate-900">{getMonthLabel(visibleMonth)}</h3>
-                    <p className="mt-1 text-sm text-slate-600">Tap a date to see the events planned for that day.</p>
                   </div>
 
                   <div className="flex items-center gap-2">

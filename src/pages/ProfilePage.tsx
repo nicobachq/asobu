@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import SkillRadarChart from '../components/SkillRadarChart';
 import SkillValueBar from '../components/SkillValueBar';
@@ -216,15 +216,6 @@ function formatHistoryPeriod(entry: SportingHistoryEntry) {
   return 'Period not specified';
 }
 
-function CameraIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
-      <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.7a1.5 1.5 0 0 0 1.2-.6l.7-.9A1.5 1.5 0 0 1 11.3 4h1.4a1.5 1.5 0 0 1 1.2.6l.7.9a1.5 1.5 0 0 0 1.2.6h1.7A2.5 2.5 0 0 1 20 8.5v7A2.5 2.5 0 0 1 17.5 18h-11A2.5 2.5 0 0 1 4 15.5v-7Z" />
-      <circle cx="12" cy="12" r="3.25" />
-    </svg>
-  );
-}
-
 function ProfilePage() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -238,8 +229,6 @@ function ProfilePage() {
   const [profileCoverImageUrl, setProfileCoverImageUrl] = useState('');
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
   const [coverPreviewUrl, setCoverPreviewUrl] = useState('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<RoleSelectionState>(
     buildRoleSelectionMap(['player'])
   );
@@ -278,6 +267,9 @@ function ProfilePage() {
   const [orgMessage, setOrgMessage] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [openMediaMenu, setOpenMediaMenu] = useState<'avatar' | 'banner' | null>(null);
+  const [savingMedia, setSavingMedia] = useState<'avatar' | 'banner' | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedRoleValues = useMemo(
     () =>
@@ -684,6 +676,65 @@ function ProfilePage() {
   }
 
 
+
+  async function persistProfileMedia(options: { target: 'avatar' | 'banner'; file?: File | null; remove?: boolean }) {
+    if (!profileId) return;
+
+    const { target, file, remove } = options;
+    const label = target === 'avatar' ? 'Profile photo' : 'Profile banner';
+    const existingUrl = target === 'avatar' ? profileAvatarUrl : profileCoverImageUrl;
+
+    setSavingMedia(target);
+    setOpenMediaMenu(null);
+    setMessage('');
+
+    try {
+      let nextUrl: string | null = remove ? null : existingUrl.trim() || null;
+
+      if (!remove && file) {
+        nextUrl = await uploadProfileMedia(file, profileId, target === 'avatar' ? 'avatar' : 'banner');
+      }
+
+      const updates =
+        target === 'avatar'
+          ? { avatar_url: nextUrl }
+          : { cover_image_url: nextUrl };
+
+      const { error } = await supabase.from('profiles').update(updates).eq('id', profileId);
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
+
+      if (target === 'avatar') {
+        revokeObjectUrl(avatarPreviewUrl);
+        setProfileAvatarUrl(nextUrl || '');
+        setAvatarPreviewUrl(nextUrl || '');
+      } else {
+        revokeObjectUrl(coverPreviewUrl);
+        setProfileCoverImageUrl(nextUrl || '');
+        setCoverPreviewUrl(nextUrl || '');
+      }
+
+      setMessage(remove ? `${label} removed.` : `${label} updated.`);
+    } catch (uploadError) {
+      setMessage(uploadError instanceof Error ? `Error: ${uploadError.message}` : `Error updating ${label.toLowerCase()}.`);
+    } finally {
+      setSavingMedia(null);
+    }
+  }
+
+  function triggerAvatarPicker() {
+    setOpenMediaMenu(null);
+    avatarInputRef.current?.click();
+  }
+
+  function triggerCoverPicker() {
+    setOpenMediaMenu(null);
+    coverInputRef.current?.click();
+  }
+
   function handleAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -696,13 +747,7 @@ function ProfilePage() {
       return;
     }
 
-    revokeObjectUrl(avatarPreviewUrl);
-    const nextPreviewUrl = URL.createObjectURL(file);
-    setAvatarFile(file);
-    setProfileAvatarUrl('');
-    setAvatarPreviewUrl(nextPreviewUrl);
-    setMessage('');
-    setOpenMediaMenu(null);
+    void persistProfileMedia({ target: 'avatar', file });
   }
 
   function handleCoverFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -717,55 +762,30 @@ function ProfilePage() {
       return;
     }
 
-    revokeObjectUrl(coverPreviewUrl);
-    const nextPreviewUrl = URL.createObjectURL(file);
-    setCoverFile(file);
-    setProfileCoverImageUrl('');
-    setCoverPreviewUrl(nextPreviewUrl);
-    setMessage('');
-    setOpenMediaMenu(null);
+    void persistProfileMedia({ target: 'banner', file });
   }
 
   function handleRemoveAvatar() {
-    revokeObjectUrl(avatarPreviewUrl);
-    setAvatarFile(null);
-    setProfileAvatarUrl('');
-    setAvatarPreviewUrl('');
-    setOpenMediaMenu(null);
+    void persistProfileMedia({ target: 'avatar', remove: true });
   }
 
   function handleRemoveCover() {
-    revokeObjectUrl(coverPreviewUrl);
-    setCoverFile(null);
-    setProfileCoverImageUrl('');
-    setCoverPreviewUrl('');
-    setOpenMediaMenu(null);
+    void persistProfileMedia({ target: 'banner', remove: true });
   }
 
   function handleStartProfileEdit() {
     setMessage('');
-    setOpenMediaMenu(null);
     setIsEditingProfile(true);
   }
 
   function handleCancelProfileEdit() {
     setMessage('');
-    setOpenMediaMenu(null);
     setIsEditingProfile(false);
     setFullName(profile?.full_name || '');
     setLocation(profile?.location || '');
     setMainSport(profile?.main_sport || '');
     setSelectedRoles(savedRoleSelection);
     setPrimaryRole(savedPrimaryRole);
-
-    revokeObjectUrl(avatarPreviewUrl);
-    revokeObjectUrl(coverPreviewUrl);
-    setAvatarFile(null);
-    setCoverFile(null);
-    setProfileAvatarUrl(profile?.avatar_url || '');
-    setProfileCoverImageUrl(profile?.cover_image_url || '');
-    setAvatarPreviewUrl(profile?.avatar_url || '');
-    setCoverPreviewUrl(profile?.cover_image_url || '');
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -776,23 +796,6 @@ function ProfilePage() {
     setSaving(true);
     setMessage('');
 
-    let nextAvatarUrl: string | null = profileAvatarUrl.trim() || null;
-    let nextCoverImageUrl: string | null = profileCoverImageUrl.trim() || null;
-
-    try {
-      if (avatarFile) {
-        nextAvatarUrl = await uploadProfileMedia(avatarFile, profileId, 'avatar');
-      }
-
-      if (coverFile) {
-        nextCoverImageUrl = await uploadProfileMedia(coverFile, profileId, 'banner');
-      }
-    } catch (uploadError) {
-      setMessage(uploadError instanceof Error ? `Error: ${uploadError.message}` : 'Error uploading profile media.');
-      setSaving(false);
-      return;
-    }
-
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -800,8 +803,6 @@ function ProfilePage() {
         role: primaryRole,
         location,
         main_sport: mainSport,
-        avatar_url: nextAvatarUrl,
-        cover_image_url: nextCoverImageUrl,
       })
       .eq('id', profileId);
 
@@ -837,26 +838,18 @@ function ProfilePage() {
             role: primaryRole,
             location,
             main_sport: mainSport,
-            avatar_url: nextAvatarUrl,
-            cover_image_url: nextCoverImageUrl,
           }
         : prev
     );
     setSavedRoleSelection(buildRoleSelectionMap(selectedRoleValues));
     setSavedPrimaryRole(primaryRole);
-    setProfileAvatarUrl(nextAvatarUrl || '');
-    setProfileCoverImageUrl(nextCoverImageUrl || '');
-    setAvatarPreviewUrl(nextAvatarUrl || '');
-    setCoverPreviewUrl(nextCoverImageUrl || '');
-    setAvatarFile(null);
-    setCoverFile(null);
-    setOpenMediaMenu(null);
     setMessage('Profile updated successfully.');
     setIsEditingProfile(false);
     setSaving(false);
   }
 
   async function handleCreateOrganization(e: React.FormEvent) {
+
     e.preventDefault();
 
     if (!profileId || !orgName.trim()) return;
@@ -1147,8 +1140,6 @@ function ProfilePage() {
     hasCompleteSkillIdentity(activeSkillTemplate, skillEntries as SkillEntryValue[]);
 
   const isSkillIdentityLocked = hasSavedSportSpecificSkills;
-  const hasAvatarMedia = Boolean((avatarPreviewUrl || '').trim());
-  const hasCoverMedia = Boolean((coverPreviewUrl || '').trim());
 
   if (!profile) {
     return (
@@ -1174,77 +1165,71 @@ function ProfilePage() {
                 : undefined
             }
           >
-            {isEditingProfile && (
-              <>
-                <input id="profile-banner-input" type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
-                <div className="absolute right-4 top-4">
-                  <button
-                    type="button"
-                    onClick={() => setOpenMediaMenu((current) => (current === 'banner' ? null : 'banner'))}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-800 shadow-lg backdrop-blur transition hover:bg-white md:opacity-0 md:group-hover:opacity-100"
-                    aria-label="Edit banner"
-                  >
-                    <CameraIcon />
-                  </button>
-                  {openMediaMenu === 'banner' && (
-                    <div className="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                      <label htmlFor="profile-banner-input" className="block cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                        Change banner
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleRemoveCover}
-                        disabled={!hasCoverMedia && !coverFile}
-                        className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Remove banner
+            <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
+            <div className="absolute right-4 top-4 z-10">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setOpenMediaMenu((current) => (current === 'banner' ? null : 'banner'))}
+                  className={`flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/95 text-slate-700 shadow-lg transition sm:opacity-0 sm:group-hover:opacity-100 ${openMediaMenu === 'banner' ? 'opacity-100' : ''}`}
+                  aria-label="Edit banner"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                    <path d="M4.5 7.5h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 9v8.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5V9A1.5 1.5 0 0 1 4.5 7.5Z" />
+                    <circle cx="12" cy="13" r="3.5" />
+                  </svg>
+                </button>
+                {openMediaMenu === 'banner' ? (
+                  <div className="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                    <button type="button" onClick={triggerCoverPicker} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+                      {savingMedia === 'banner' ? 'Uploading…' : 'Change banner'}
+                    </button>
+                    {coverPreviewUrl ? (
+                      <button type="button" onClick={handleRemoveCover} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50">
+                        {savingMedia === 'banner' ? 'Removing…' : 'Remove banner'}
                       </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </div>
 
           <div className="p-6">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div className="flex-1">
-                <div className="group relative -mt-20 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
-                  {avatarPreviewUrl ? (
-                    <img src={avatarPreviewUrl} alt={profile.full_name || fullName || 'Asobu User'} className="h-full w-full object-cover" />
-                  ) : (
-                    getInitials(profile.full_name || fullName || 'Asobu User')
-                  )}
-                  {isEditingProfile && (
-                    <>
-                      <input id="profile-avatar-input" type="file" accept="image/*" className="hidden" onChange={handleAvatarFileChange} />
-                      <div className="absolute bottom-1 right-1">
-                        <button
-                          type="button"
-                          onClick={() => setOpenMediaMenu((current) => (current === 'avatar' ? null : 'avatar'))}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/92 text-slate-800 shadow-lg backdrop-blur transition hover:bg-white md:opacity-0 md:group-hover:opacity-100"
-                          aria-label="Edit profile photo"
-                        >
-                          <CameraIcon />
+                <div className="relative -mt-20 h-28 w-28">
+                  <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarFileChange} />
+                  <div className="group flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
+                    {avatarPreviewUrl ? (
+                      <img src={avatarPreviewUrl} alt={profile.full_name || fullName || 'Asobu User'} className="h-full w-full object-cover" />
+                    ) : (
+                      getInitials(profile.full_name || fullName || 'Asobu User')
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setOpenMediaMenu((current) => (current === 'avatar' ? null : 'avatar'))}
+                      className={`absolute bottom-1 right-1 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/95 text-slate-700 shadow-lg transition sm:opacity-0 sm:group-hover:opacity-100 ${openMediaMenu === 'avatar' ? 'opacity-100' : ''}`}
+                      aria-label="Edit profile photo"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.5 w-4.5">
+                        <path d="M4.5 7.5h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 9v8.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5V9A1.5 1.5 0 0 1 4.5 7.5Z" />
+                        <circle cx="12" cy="13" r="3.5" />
+                      </svg>
+                    </button>
+                  </div>
+                  {openMediaMenu === 'avatar' ? (
+                    <div className="absolute left-0 top-[calc(100%+0.5rem)] z-20 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                      <button type="button" onClick={triggerAvatarPicker} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+                        {savingMedia === 'avatar' ? 'Uploading…' : 'Change photo'}
+                      </button>
+                      {avatarPreviewUrl ? (
+                        <button type="button" onClick={handleRemoveAvatar} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50">
+                          {savingMedia === 'avatar' ? 'Removing…' : 'Remove photo'}
                         </button>
-                        {openMediaMenu === 'avatar' && (
-                          <div className="absolute right-0 top-12 z-10 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                            <label htmlFor="profile-avatar-input" className="block cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                              Change photo
-                            </label>
-                            <button
-                              type="button"
-                              onClick={handleRemoveAvatar}
-                              disabled={!hasAvatarMedia && !avatarFile}
-                              className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              Remove photo
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 <h1 className="mt-4 text-3xl font-bold text-slate-900">
@@ -1308,11 +1293,6 @@ function ProfilePage() {
                   >
                     View public profile
                   </Link>
-                  {isEditingProfile && (
-                    <span className="inline-flex items-center justify-center rounded-2xl border border-[color:color-mix(in_oklab,var(--asobu-primary)_20%,white_80%)] bg-[color:color-mix(in_oklab,var(--asobu-primary)_10%,white_90%)] px-4 py-3 text-sm font-medium text-[var(--asobu-primary-dark)]">
-                      Edit mode active
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -1361,23 +1341,22 @@ function ProfilePage() {
 
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
+
             <section className="rounded-3xl bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Profile basics</h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Keep your profile structured and standardized so scouts, coaches, and organizations can compare people more clearly.
-                  </p>
-                  {isEditingProfile && (
-                    <p className="mt-3 text-xs font-medium text-slate-500">Use the camera icons on your photo and banner to change or remove them.</p>
-                  )}
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${isEditingProfile ? 'bg-[color:color-mix(in_oklab,var(--asobu-primary)_14%,white_86%)] text-[var(--asobu-primary-dark)]' : 'bg-slate-100 text-slate-600'}`}>
-                    {isEditingProfile ? 'Editing profile' : 'View mode'}
-                  </span>
+                <div className="flex flex-wrap gap-3">
                   {isEditingProfile ? (
                     <>
+                      <button
+                        type="button"
+                        onClick={handleCancelProfileEdit}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
                       <button
                         type="submit"
                         form="profile-basics-form"
@@ -1386,29 +1365,17 @@ function ProfilePage() {
                       >
                         {saving ? 'Saving...' : 'Save changes'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelProfileEdit}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        Cancel
-                      </button>
                     </>
                   ) : (
                     <button
                       type="button"
                       onClick={handleStartProfileEdit}
-                      className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
-                      Edit profile
+                      Edit basics
                     </button>
                   )}
                 </div>
-              </div>
-              <div className="mt-6 rounded-[24px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
-                {isEditingProfile
-                  ? 'Edit your core identity below. Use the camera icons on the banner and profile photo to manage images.'
-                  : 'Start edit mode to update your identity details and media.'}
               </div>
 
               <form id="profile-basics-form" onSubmit={handleSave} className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

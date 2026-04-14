@@ -553,7 +553,7 @@ function FeedPage() {
                 Keep your sports identity active, visible, and connected.
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-                Home is your activity layer inside Asobu: share relevant updates, follow the next events in your world, and keep your profile moving forward.
+                Follow updates, events, and momentum across your sports network.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link to="/profile" className="app-button-primary rounded-full px-5 py-3 text-sm font-semibold">
@@ -568,17 +568,17 @@ function FeedPage() {
               <div className="rounded-[24px] border border-slate-200/80 bg-white/85 p-4 shadow-sm">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Posts</p>
                 <p className="mt-2 text-3xl font-bold text-slate-900">{posts.length}</p>
-                <p className="mt-2 text-xs leading-5 text-slate-500">Updates shaping your public sports identity.</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Visible updates in your network.</p>
               </div>
               <div className="rounded-[24px] border border-slate-200/80 bg-white/85 p-4 shadow-sm">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Managed orgs</p>
                 <p className="mt-2 text-3xl font-bold text-slate-900">{manageableOrganizations.length}</p>
-                <p className="mt-2 text-xs leading-5 text-slate-500">Teams, clubs, and communities you can publish for.</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Organizations you can publish for.</p>
               </div>
               <div className="rounded-[24px] border border-slate-200/80 bg-white/85 p-4 shadow-sm">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Upcoming</p>
                 <p className="mt-2 text-3xl font-bold text-slate-900">{upcomingCount}</p>
-                <p className="mt-2 text-xs leading-5 text-slate-500">Events already connected to your sporting world.</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Scheduled activity in your network.</p>
               </div>
             </div>
           </div>
@@ -593,9 +593,7 @@ function FeedPage() {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Coming up</p>
                     <h2 className="mt-2 text-xl font-semibold text-slate-900">Upcoming activity</h2>
-                    <p className="mt-2 text-sm leading-7 text-slate-600">
-                      Your next visible sporting moments across personal and organization-linked events.
-                    </p>
+
                   </div>
                   <Link to="/calendar" className="app-button-secondary rounded-full px-4 py-2.5 text-sm font-medium">
                     Open calendar
