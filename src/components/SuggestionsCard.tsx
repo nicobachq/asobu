@@ -26,8 +26,8 @@ function getInitials(name: string) {
 function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
-      <section className="overflow-hidden rounded-[28px] bg-white shadow-sm sm:rounded-[32px]">
-        <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-4 py-5 text-white sm:px-5">
+      <section className="app-card overflow-hidden rounded-[28px] sm:rounded-[32px]">
+        <div className="app-gradient-panel px-4 py-5 text-white sm:px-5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Your network</p>
           <h2 className="mt-2 text-lg font-bold">Managed organizations</h2>
           <p className="mt-2 text-sm leading-7 text-white/75">
@@ -40,7 +40,7 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
             <p className="text-sm font-semibold text-slate-900">Quick access</p>
             <Link
               to="/organizations"
-              className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="app-button-secondary rounded-full px-3 py-1.5 text-xs font-medium"
             >
               View all
             </Link>
@@ -52,9 +52,9 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
                 <Link
                   key={organization.id}
                   to={`/organizations/${organization.id}`}
-                  className="flex items-center gap-3 rounded-[22px] bg-slate-50 p-3 transition hover:bg-slate-100 sm:rounded-[24px]"
+                  className="app-card-subtle flex items-center gap-3 rounded-[22px] p-3 transition hover:bg-white/[0.08] sm:rounded-[24px]"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04]">
                     {organization.logo_url ? (
                       <img
                         src={organization.logo_url}
@@ -62,7 +62,7 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
                         className="h-full w-full rounded-2xl object-contain p-1.5"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-900 text-xs font-semibold text-white">
+                      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(45,212,191,.28),rgba(245,158,11,.2))] text-xs font-semibold text-white">
                         {getInitials(organization.name)}
                       </div>
                     )}
@@ -76,7 +76,7 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
                 </Link>
               ))
             ) : (
-              <div className="rounded-[22px] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500 sm:rounded-[24px]">
+              <div className="rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-500 sm:rounded-[24px]">
                 You do not manage any organizations yet.
               </div>
             )}
@@ -84,12 +84,12 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
         </div>
       </section>
 
-      <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-5">
+      <section className="app-card rounded-[28px] p-4 sm:rounded-[32px] sm:p-5">
         <h2 className="text-lg font-semibold text-slate-900">Next moves</h2>
         <div className="mt-4 space-y-3 text-sm text-slate-600">
           <Link
             to="/profile"
-            className="block rounded-[22px] bg-slate-50 p-4 transition hover:bg-slate-100 sm:rounded-[24px]"
+            className="app-card-subtle block rounded-[22px] p-4 transition hover:bg-white/[0.08] sm:rounded-[24px]"
           >
             <p className="font-semibold text-slate-900">Strengthen your identity</p>
             <p className="mt-1 leading-7">Complete your profile, clarify your role, and improve your public visibility.</p>
@@ -97,7 +97,7 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
 
           <Link
             to="/discover"
-            className="block rounded-[22px] bg-slate-50 p-4 transition hover:bg-slate-100 sm:rounded-[24px]"
+            className="app-card-subtle block rounded-[22px] p-4 transition hover:bg-white/[0.08] sm:rounded-[24px]"
           >
             <p className="font-semibold text-slate-900">Expand your network</p>
             <p className="mt-1 leading-7">Search players, coaches, and every kind of organization that fits your sporting world.</p>
@@ -105,14 +105,14 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
         </div>
       </section>
 
-      <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-5">
+      <section className="app-card rounded-[28px] p-4 sm:rounded-[32px] sm:p-5">
         <h2 className="text-lg font-semibold text-slate-900">What works well on Asobu</h2>
         <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
-          <div className="rounded-[22px] bg-slate-50 p-4 sm:rounded-[24px]">
+          <div className="app-card-subtle rounded-[22px] p-4 sm:rounded-[24px]">
             <p className="font-semibold text-slate-900">Identity posts with media</p>
             <p className="mt-1">Photos, match moments, and community images make profiles more credible.</p>
           </div>
-          <div className="rounded-[22px] bg-slate-50 p-4 sm:rounded-[24px]">
+          <div className="app-card-subtle rounded-[22px] p-4 sm:rounded-[24px]">
             <p className="font-semibold text-slate-900">Clear role and sport context</p>
             <p className="mt-1">The strongest profiles make it obvious who they are, what they do, and where they play.</p>
           </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
-import Navbar from "./components/Navbar";
+import AppShell from "./components/AppShell";
 import FeedPage from "./pages/FeedPage";
 import DiscoverPage from "./pages/DiscoverPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -135,8 +135,8 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">
-        Loading...
+      <div className="flex min-h-screen items-center justify-center bg-[#07111d] text-slate-200">
+        <div className="rounded-[28px] border border-white/8 bg-white/[0.04] px-6 py-5 shadow-[0_18px_40px_rgba(0,0,0,.28)]">Loading Asobu…</div>
       </div>
     );
   }
@@ -155,9 +155,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <Navbar onLogout={handleLogout} />
-
+    <AppShell onLogout={handleLogout}>
       <Routes>
         <Route path="/" element={<FeedPage />} />
         <Route path="/discover" element={<DiscoverPage />} />
@@ -171,7 +169,7 @@ function App() {
         <Route path="/auth" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </div>
+    </AppShell>
   );
 }
 

@@ -29,11 +29,11 @@ function ProfileCard({ profile }: ProfileCardProps) {
   const visibleOpenTo = profile.openTo.filter(Boolean);
 
   return (
-    <div className="overflow-hidden rounded-[28px] bg-white shadow-sm sm:rounded-[32px]">
-      <div className="h-24 bg-gradient-to-r from-blue-600 via-sky-500 to-emerald-500 sm:h-28" />
+    <div className="app-card overflow-hidden rounded-[28px] sm:rounded-[32px]">
+      <div className="app-gradient-panel h-24 sm:h-28" />
 
       <div className="p-4 sm:p-5">
-        <div className="-mt-12 flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-slate-900 text-xl font-bold text-white shadow-sm sm:-mt-16 sm:h-28 sm:w-28 sm:text-2xl">
+        <div className="-mt-12 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[#0b1422] bg-[linear-gradient(135deg,rgba(45,212,191,.3),rgba(245,158,11,.22))] text-xl font-bold text-white shadow-[0_18px_34px_rgba(0,0,0,.3)] sm:-mt-16 sm:h-28 sm:w-28 sm:text-2xl">
           {getInitials(profile.name)}
         </div>
 
@@ -46,7 +46,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-[22px] bg-slate-50 px-4 py-4 sm:rounded-[24px]">
+          <div className="app-card-subtle rounded-[22px] px-4 py-4 sm:rounded-[24px]">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Organization
             </p>
@@ -55,7 +55,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
             </p>
           </div>
 
-          <div className="rounded-[22px] bg-slate-50 px-4 py-4 sm:rounded-[24px]">
+          <div className="app-card-subtle rounded-[22px] px-4 py-4 sm:rounded-[24px]">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Open to
             </p>
@@ -72,7 +72,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
               {visibleSports.map((sport) => (
                 <span
                   key={sport}
-                  className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700"
+                  className="app-chip-brand rounded-full px-3 py-1 text-xs font-medium"
                 >
                   {sport}
                 </span>
@@ -85,7 +85,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
 
         <Link
           to="/profile"
-          className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+          className="app-button-primary mt-6 inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-medium"
         >
           Edit Profile
         </Link>

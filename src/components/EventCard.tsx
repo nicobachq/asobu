@@ -61,10 +61,10 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
   const mapsUrl = event.location ? buildGoogleMapsSearchUrl(event.location) : null;
 
   return (
-    <article className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <article className="app-card rounded-[28px] p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 gap-4">
-          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-slate-900 text-center text-white">
+          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-[linear-gradient(160deg,rgba(9,17,31,.98),rgba(18,31,50,.98))] text-center text-white ring-1 ring-white/8">
             <span className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Date</span>
             <span className="text-sm font-semibold">{formatEventDateBadge(event.starts_at)}</span>
           </div>
@@ -93,7 +93,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
             </div>
 
             {isMatch ? (
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <div className="app-card-subtle rounded-2xl px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Match details</p>
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-700">
                   {primaryOrganization ? (
@@ -118,7 +118,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
                     <span className="font-medium text-slate-900">{opponentLabel}</span>
                   )}
                   {hasScore ? (
-                    <span className="rounded-full bg-slate-900 px-3 py-1 text-sm font-semibold text-white">
+                    <span className="rounded-full bg-[linear-gradient(135deg,rgba(45,212,191,.22),rgba(245,158,11,.18))] px-3 py-1 text-sm font-semibold text-white ring-1 ring-white/8">
                       {event.score_for} - {event.score_against}
                     </span>
                   ) : null}
@@ -161,7 +161,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
               <button
                 type="button"
                 onClick={() => onEdit(event.id)}
-                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className="app-button-secondary rounded-full px-4 py-2 text-sm font-medium transition"
               >
                 Edit
               </button>
@@ -170,7 +170,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
               <button
                 type="button"
                 onClick={() => onDelete(event.id)}
-                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                className="rounded-full border border-rose-300/15 bg-rose-400/8 px-4 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/14"
               >
                 Delete
               </button>

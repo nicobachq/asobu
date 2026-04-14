@@ -158,8 +158,8 @@ function FeedCard({
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
-        <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-6 py-6 text-white">
+      <section className="app-card overflow-hidden rounded-[32px]">
+        <div className="app-gradient-panel px-6 py-6 text-white">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">
@@ -170,7 +170,7 @@ function FeedCard({
                 Publish as yourself or as one of your organizations. Text, images, and external media links all become part of your sports identity.
               </p>
             </div>
-            <div className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur">
+            <div className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-medium text-white/90 backdrop-blur">
               {selectedOrganization ? `Publishing as ${selectedOrganization.name}` : `Publishing as ${currentProfileName}`}
             </div>
           </div>
@@ -185,7 +185,7 @@ function FeedCard({
               <select
                 value={selectedPublisher}
                 onChange={(e) => setSelectedPublisher(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                className="w-full rounded-2xl border border-white/8 bg-white/[0.05] px-4 py-3 text-sm outline-none focus:border-cyan-300/30"
               >
                 <option value="me">Me · {currentProfileName}</option>
                 {manageableOrganizations.map((organization) => (
@@ -204,7 +204,7 @@ function FeedCard({
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="Share a result, achievement, photo, YouTube link, social post, transfer update, or community news..."
-                className="min-h-[140px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-300"
+                className="min-h-[140px] w-full rounded-2xl border border-white/8 bg-white/[0.05] px-4 py-4 text-sm text-slate-100 outline-none placeholder:text-slate-400 focus:border-cyan-300/30"
               />
             </div>
           </div>
@@ -234,9 +234,9 @@ function FeedCard({
             </div>
           )}
 
-          <div className="mt-5 rounded-[24px] bg-slate-50 p-4">
+          <div className="app-card-subtle mt-5 rounded-[24px] p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <label className="inline-flex cursor-pointer items-center rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-100">
+              <label className="app-button-secondary inline-flex cursor-pointer items-center rounded-full px-4 py-2 text-sm font-medium">
                 Add image
                 <input type="file" accept="image/*" className="hidden" onChange={onPostImageChange} />
               </label>
@@ -245,13 +245,13 @@ function FeedCard({
                 <button
                   type="button"
                   onClick={onRemovePostImage}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-100"
+                  className="app-button-secondary rounded-full px-4 py-2 text-sm font-medium"
                 >
                   Remove image
                 </button>
               )}
 
-              <span className="ml-auto rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500">
+              <span className="app-chip ml-auto rounded-full px-3 py-1 text-xs font-medium">
                 {composerExternalMedia ? "Media link detected" : "Media ready"}
               </span>
             </div>
@@ -267,7 +267,7 @@ function FeedCard({
             )}
 
             {postImagePreviewUrl && (
-              <div className="mt-4 overflow-hidden rounded-[24px] bg-white">
+              <div className="mt-4 overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.04]">
                 <img
                   src={postImagePreviewUrl}
                   alt="Post preview"
@@ -279,10 +279,10 @@ function FeedCard({
 
           <div className="mt-5 flex items-center justify-between gap-4">
             <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <span className="app-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
                 Identity post
               </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <span className="app-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
                 Images + links
               </span>
             </div>
@@ -291,7 +291,7 @@ function FeedCard({
               type="button"
               onClick={onCreatePost}
               disabled={creating || !canPublish}
-              className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+              className="app-button-primary rounded-full px-6 py-3 text-sm font-semibold disabled:opacity-50"
             >
               {creating ? "Posting..." : "Publish on Asobu"}
             </button>
@@ -304,7 +304,7 @@ function FeedCard({
       </section>
 
       {posts.length === 0 ? (
-        <div className="rounded-[32px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
+        <div className="rounded-[32px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
           No posts yet.
         </div>
       ) : (
