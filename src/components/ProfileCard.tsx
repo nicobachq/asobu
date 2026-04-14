@@ -7,6 +7,8 @@ type Profile = {
   sports: string[];
   organization: string;
   openTo: string[];
+  avatarUrl?: string | null;
+  coverImageUrl?: string | null;
 };
 
 type ProfileCardProps = {
@@ -30,11 +32,24 @@ function ProfileCard({ profile }: ProfileCardProps) {
 
   return (
     <div className="app-card overflow-hidden rounded-[28px] sm:rounded-[32px]">
-      <div className="app-gradient-panel h-24 sm:h-28" />
+      <div
+        className="app-gradient-panel h-24 bg-cover bg-center sm:h-28"
+        style={
+          profile.coverImageUrl
+            ? {
+                backgroundImage: `linear-gradient(135deg, rgba(13, 148, 136, 0.16), rgba(249, 115, 22, 0.12)), url(${profile.coverImageUrl})`,
+              }
+            : undefined
+        }
+      />
 
       <div className="p-4 sm:p-5">
-        <div className="-mt-12 flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-xl font-bold text-[var(--asobu-primary-dark)] shadow-[0_14px_28px_rgba(15,23,42,.08)] sm:-mt-16 sm:h-28 sm:w-28 sm:text-2xl">
-          {getInitials(profile.name)}
+        <div className="-mt-12 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-xl font-bold text-[var(--asobu-primary-dark)] shadow-[0_14px_28px_rgba(15,23,42,.08)] sm:-mt-16 sm:h-28 sm:w-28 sm:text-2xl">
+          {profile.avatarUrl ? (
+            <img src={profile.avatarUrl} alt={profile.name} className="h-full w-full object-cover" />
+          ) : (
+            getInitials(profile.name)
+          )}
         </div>
 
         <div className="mt-4">
