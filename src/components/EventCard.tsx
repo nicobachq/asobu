@@ -39,17 +39,25 @@ type EventCardProps = {
   currentUserId?: string | null;
   onDelete?: (eventId: number) => void;
   onEdit?: (eventId: number) => void;
+  perspectiveOrganizationId?: number | null;
 };
 
-function EventCard({ event, currentUserId, onDelete, onEdit }: EventCardProps) {
+function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganizationId = null }: EventCardProps) {
   const isOwner = !!currentUserId && currentUserId === event.created_by;
   const isMatch = event.event_type === 'match';
   const hasScore =
     typeof event.score_for === 'number' && !Number.isNaN(event.score_for) &&
     typeof event.score_against === 'number' && !Number.isNaN(event.score_against);
 
-  const yourSideLabel = event.related_organization?.name || 'Your side';
-  const opponentLabel = event.opponent_organization?.name || event.opponent_name || 'Opponent TBD';
+  const primaryOrganization = perspectiveOrganizationId && event.opponent_organization?.id === perspectiveOrganizationId
+    ? event.opponent_organization
+    : event.related_organization || null;
+  const secondaryOrganization = perspectiveOrganizationId && event.opponent_organization?.id === perspectiveOrganizationId
+    ? event.related_organization || null
+    : event.opponent_organization || null;
+
+  const yourSideLabel = primaryOrganization?.name || (perspectiveOrganizationId && event.related_organization?.id !== perspectiveOrganizationId ? 'This organization' : 'Your side');
+  const opponentLabel = secondaryOrganization?.name || (primaryOrganization?.id === event.opponent_organization?.id ? (event.related_organization?.name || 'Opponent TBD') : event.opponent_name || 'Opponent TBD');
   const mapsUrl = event.location ? buildGoogleMapsSearchUrl(event.location) : null;
 
   return (
@@ -88,9 +96,9 @@ function EventCard({ event, currentUserId, onDelete, onEdit }: EventCardProps) {
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Match details</p>
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-700">
-                  {event.related_organization ? (
+                  {primaryOrganization ? (
                     <Link
-                      to={`/organizations/${event.related_organization.id}`}
+                      to={`/organizations/${primaryOrganization.id}`}
                       className="font-medium text-slate-900 transition hover:text-slate-700"
                     >
                       {yourSideLabel}
@@ -99,9 +107,9 @@ function EventCard({ event, currentUserId, onDelete, onEdit }: EventCardProps) {
                     <span className="font-medium text-slate-900">{yourSideLabel}</span>
                   )}
                   <span className="text-slate-400">vs</span>
-                  {event.opponent_organization ? (
+                  {secondaryOrganization ? (
                     <Link
-                      to={`/organizations/${event.opponent_organization.id}`}
+                      to={`/organizations/${secondaryOrganization.id}`}
                       className="font-medium text-slate-900 transition hover:text-slate-700"
                     >
                       {opponentLabel}

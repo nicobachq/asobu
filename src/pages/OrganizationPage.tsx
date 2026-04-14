@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { getFileFromInputEvent, revokeObjectUrl, uploadPostImage, validatePostImageFile } from "../lib/media";
 import ProfileCard from "../components/ProfileCard";
+import EventCard from "../components/EventCard";
 import ExternalMediaCard from "../components/ExternalMediaCard";
 import {
   formatOrganizationTypeLabel,
@@ -132,6 +133,39 @@ type OrganizationMember = {
   profiles: RelatedProfile | null;
 };
 
+type EventLinkedOrganization = {
+  id: number;
+  name: string;
+  organization_type: string | null;
+};
+
+type RawOrganizationEvent = {
+  id: number;
+  title: string;
+  event_type: string;
+  status: string;
+  visibility: string;
+  sport: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  location: string | null;
+  description: string | null;
+  competition_name: string | null;
+  opponent_name: string | null;
+  score_for: number | null;
+  score_against: number | null;
+  created_by: string;
+  related_organization_id: number | null;
+  opponent_organization_id: number | null;
+  related_organization: EventLinkedOrganization | EventLinkedOrganization[] | null;
+  opponent_organization: EventLinkedOrganization | EventLinkedOrganization[] | null;
+};
+
+type OrganizationEvent = Omit<RawOrganizationEvent, 'related_organization' | 'opponent_organization'> & {
+  related_organization: EventLinkedOrganization | null;
+  opponent_organization: EventLinkedOrganization | null;
+};
+
 type JoinRequestRow = {
   id: number;
   organization_id: number;
@@ -239,6 +273,9 @@ function OrganizationPage() {
   const [transferringOwnership, setTransferringOwnership] = useState(false);
 
   const [posts, setPosts] = useState<Post[]>([]);
+  const [organizationEvents, setOrganizationEvents] = useState<OrganizationEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventScope, setEventScope] = useState<"upcoming" | "past" | "all">("upcoming");
   const [likes, setLikes] = useState<PostLike[]>([]);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [newPost, setNewPost] = useState("");
@@ -341,6 +378,7 @@ function OrganizationPage() {
         loadCurrentUserProfile(authUserId),
         loadOrganizationData(organizationId, authUserId),
         loadOrganizationPosts(organizationId),
+        loadOrganizationEvents(organizationId, authUserId),
         loadLikes(),
         loadComments(),
       ]);
@@ -584,6 +622,64 @@ function OrganizationPage() {
     }));
 
     setPosts(normalizedPosts);
+  }
+
+  async function loadOrganizationEvents(orgId: number, userId: string | null) {
+    setEventsLoading(true);
+
+    const eventSelect =
+      "id, title, event_type, status, visibility, sport, starts_at, ends_at, location, description, competition_name, opponent_name, score_for, score_against, created_by, related_organization_id, opponent_organization_id, related_organization:organizations!events_related_organization_id_fkey(id, name, organization_type), opponent_organization:organizations!events_opponent_organization_id_fkey(id, name, organization_type)";
+
+    const publicEventsPromise = supabase
+      .from("events")
+      .select(eventSelect)
+      .eq("visibility", "public")
+      .or(`related_organization_id.eq.${orgId},opponent_organization_id.eq.${orgId}`)
+      .order("starts_at", { ascending: true });
+
+    const privateOwnEventsPromise = userId
+      ? supabase
+          .from("events")
+          .select(eventSelect)
+          .eq("visibility", "private")
+          .eq("created_by", userId)
+          .or(`related_organization_id.eq.${orgId},opponent_organization_id.eq.${orgId}`)
+          .order("starts_at", { ascending: true })
+      : Promise.resolve({ data: [], error: null } as const);
+
+    const [publicEventsResponse, privateOwnEventsResponse] = await Promise.all([
+      publicEventsPromise,
+      privateOwnEventsPromise,
+    ]);
+
+    if (publicEventsResponse.error) {
+      console.error("Error loading organization events:", publicEventsResponse.error.message);
+      setOrganizationEvents([]);
+      setEventsLoading(false);
+      return;
+    }
+
+    if (privateOwnEventsResponse.error) {
+      console.error("Error loading private organization events:", privateOwnEventsResponse.error.message);
+    }
+
+    const normalizeEvent = (event: RawOrganizationEvent): OrganizationEvent => ({
+      ...event,
+      related_organization: firstRelation(event.related_organization),
+      opponent_organization: firstRelation(event.opponent_organization),
+    });
+
+    const mergedEvents = [
+      ...(((publicEventsResponse.data as RawOrganizationEvent[]) || []).map(normalizeEvent)),
+      ...((((privateOwnEventsResponse.data || []) as RawOrganizationEvent[]) || []).map(normalizeEvent)),
+    ];
+
+    const uniqueEvents = Array.from(new Map(mergedEvents.map((event) => [event.id, event])).values()).sort(
+      (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
+    );
+
+    setOrganizationEvents(uniqueEvents);
+    setEventsLoading(false);
   }
 
   async function loadLikes() {
@@ -1281,6 +1377,36 @@ function OrganizationPage() {
     return "You are not a member yet";
   }, [myMembershipRole, hasPendingRequest]);
 
+  const upcomingOrganizationEvents = useMemo(
+    () =>
+      organizationEvents.filter(
+        (event) => event.status !== "canceled" && new Date(event.starts_at).getTime() >= Date.now()
+      ),
+    [organizationEvents]
+  );
+
+  const pastOrganizationEvents = useMemo(
+    () =>
+      organizationEvents
+        .filter(
+          (event) => event.status === "completed" || new Date(event.starts_at).getTime() < Date.now()
+        )
+        .sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime()),
+    [organizationEvents]
+  );
+
+  const visibleOrganizationEvents = useMemo(() => {
+    if (eventScope === "upcoming") {
+      return upcomingOrganizationEvents;
+    }
+
+    if (eventScope === "past") {
+      return pastOrganizationEvents;
+    }
+
+    return [...organizationEvents].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+  }, [eventScope, organizationEvents, pastOrganizationEvents, upcomingOrganizationEvents]);
+
   const solidSecondaryButton =
     "rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50";
   const solidPrimaryButton =
@@ -1539,6 +1665,82 @@ function OrganizationPage() {
             )}
           </section>
         )}
+
+        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Organization events</p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-900">Calendar activity</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                Upcoming training sessions, matches, and recent results tied to this organization. This keeps the page alive without forcing formal federation structure.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to={`/calendar?organization=${organization.id}`}
+                className={smallSecondaryButton}
+              >
+                Open calendar
+              </Link>
+              {myMembershipRole ? (
+                <Link
+                  to={`/calendar?organization=${organization.id}&prefillOrganization=${organization.id}&compose=1`}
+                  className={smallPrimaryButton}
+                >
+                  Create linked event
+                </Link>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {[
+              { value: "upcoming", label: "Upcoming", count: upcomingOrganizationEvents.length },
+              { value: "past", label: "Past & results", count: pastOrganizationEvents.length },
+              { value: "all", label: "All", count: organizationEvents.length },
+            ].map((option) => {
+              const active = eventScope === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setEventScope(option.value as "upcoming" | "past" | "all")}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    active
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {option.label} · {option.count}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {eventsLoading ? (
+              <p className="text-sm text-slate-500">Loading organization events…</p>
+            ) : visibleOrganizationEvents.length === 0 ? (
+              <div className="rounded-[24px] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
+                {eventScope === "upcoming"
+                  ? "No upcoming public events are linked to this organization yet."
+                  : eventScope === "past"
+                    ? "No completed or past events are linked to this organization yet."
+                    : "No events are linked to this organization yet."}
+              </div>
+            ) : (
+              visibleOrganizationEvents.map((organizationEvent) => (
+                <EventCard
+                  key={organizationEvent.id}
+                  event={organizationEvent}
+                  currentUserId={authUserId}
+                  perspectiveOrganizationId={organization.id}
+                />
+              ))
+            )}
+          </div>
+        </section>
 
         {canEditOrganization && (
           <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">

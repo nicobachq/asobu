@@ -176,6 +176,8 @@ function CalendarPage() {
   const [scopeFilter, setScopeFilter] = useState(searchParams.get('scope') || 'all');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'all');
   const [organizationFilter, setOrganizationFilter] = useState(searchParams.get('organization') || 'all');
+  const [initialPrefillOrganizationId] = useState(() => searchParams.get('prefillOrganization') || '');
+  const [initialShouldOpenComposer] = useState(() => searchParams.get('compose') === '1');
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -196,6 +198,39 @@ function CalendarPage() {
 
     setSearchParams(next, { replace: true });
   }, [view, scopeFilter, typeFilter, organizationFilter, setSearchParams]);
+
+  useEffect(() => {
+    if (!initialPrefillOrganizationId) {
+      return;
+    }
+
+    const hasMatchingOrganization = organizations.some((organization) => String(organization.id) === initialPrefillOrganizationId);
+    if (!hasMatchingOrganization) {
+      return;
+    }
+
+    setForm((current) => {
+      if (current.relatedOrganizationId === initialPrefillOrganizationId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        relatedOrganizationId: initialPrefillOrganizationId,
+      };
+    });
+
+    setOrganizationFilter((current) => (current === 'all' ? initialPrefillOrganizationId : current));
+  }, [initialPrefillOrganizationId, organizations]);
+
+  useEffect(() => {
+    if (!initialShouldOpenComposer) {
+      return;
+    }
+
+    formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => titleInputRef.current?.focus(), 150);
+  }, [initialShouldOpenComposer]);
 
   useEffect(() => {
     if (!locationInputRef.current) return;
