@@ -33,7 +33,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
       <div className="app-gradient-panel h-24 sm:h-28" />
 
       <div className="p-4 sm:p-5">
-        <div className="-mt-12 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[#0b1422] bg-[linear-gradient(135deg,rgba(45,212,191,.3),rgba(245,158,11,.22))] text-xl font-bold text-white shadow-[0_18px_34px_rgba(0,0,0,.3)] sm:-mt-16 sm:h-28 sm:w-28 sm:text-2xl">
+        <div className="-mt-12 flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-xl font-bold text-[var(--asobu-primary-dark)] shadow-[0_14px_28px_rgba(15,23,42,.08)] sm:-mt-16 sm:h-28 sm:w-28 sm:text-2xl">
           {getInitials(profile.name)}
         </div>
 
@@ -47,7 +47,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="app-card-subtle rounded-[22px] px-4 py-4 sm:rounded-[24px]">
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
               Organization
             </p>
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">
@@ -56,7 +56,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
           </div>
 
           <div className="app-card-subtle rounded-[22px] px-4 py-4 sm:rounded-[24px]">
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
               Open to
             </p>
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">
@@ -87,7 +87,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
           to="/profile"
           className="app-button-primary mt-6 inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-medium"
         >
-          Edit Profile
+          Edit profile
         </Link>
       </div>
     </div>

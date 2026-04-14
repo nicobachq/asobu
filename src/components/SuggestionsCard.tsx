@@ -27,10 +27,10 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
       <section className="app-card overflow-hidden rounded-[28px] sm:rounded-[32px]">
-        <div className="app-gradient-panel px-4 py-5 text-white sm:px-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Your network</p>
-          <h2 className="mt-2 text-lg font-bold">Managed organizations</h2>
-          <p className="mt-2 text-sm leading-7 text-white/75">
+        <div className="app-gradient-panel px-4 py-5 sm:px-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Your network</p>
+          <h2 className="mt-2 text-lg font-bold text-slate-900">Managed organizations</h2>
+          <p className="mt-2 text-sm leading-7 text-slate-600">
             Quick access to the {getOrganizationTypeAudienceLabel().toLowerCase()} you actively shape on Asobu.
           </p>
         </div>
@@ -52,9 +52,9 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
                 <Link
                   key={organization.id}
                   to={`/organizations/${organization.id}`}
-                  className="app-card-subtle flex items-center gap-3 rounded-[22px] p-3 transition hover:bg-white/[0.08] sm:rounded-[24px]"
+                  className="app-card-subtle app-card-hover flex items-center gap-3 rounded-[22px] p-3 sm:rounded-[24px]"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white">
                     {organization.logo_url ? (
                       <img
                         src={organization.logo_url}
@@ -62,7 +62,7 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
                         className="h-full w-full rounded-2xl object-contain p-1.5"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(45,212,191,.28),rgba(245,158,11,.2))] text-xs font-semibold text-white">
+                      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-xs font-semibold text-[var(--asobu-primary-dark)]">
                         {getInitials(organization.name)}
                       </div>
                     )}
@@ -76,7 +76,7 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
                 </Link>
               ))
             ) : (
-              <div className="rounded-[22px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-500 sm:rounded-[24px]">
+              <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500 sm:rounded-[24px]">
                 You do not manage any organizations yet.
               </div>
             )}
@@ -89,7 +89,7 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
         <div className="mt-4 space-y-3 text-sm text-slate-600">
           <Link
             to="/profile"
-            className="app-card-subtle block rounded-[22px] p-4 transition hover:bg-white/[0.08] sm:rounded-[24px]"
+            className="app-card-subtle app-card-hover block rounded-[22px] p-4 sm:rounded-[24px]"
           >
             <p className="font-semibold text-slate-900">Strengthen your identity</p>
             <p className="mt-1 leading-7">Complete your profile, clarify your role, and improve your public visibility.</p>
@@ -97,7 +97,7 @@ function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
 
           <Link
             to="/discover"
-            className="app-card-subtle block rounded-[22px] p-4 transition hover:bg-white/[0.08] sm:rounded-[24px]"
+            className="app-card-subtle app-card-hover block rounded-[22px] p-4 sm:rounded-[24px]"
           >
             <p className="font-semibold text-slate-900">Expand your network</p>
             <p className="mt-1 leading-7">Search players, coaches, and every kind of organization that fits your sporting world.</p>

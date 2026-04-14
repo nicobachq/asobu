@@ -1,4 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { getFileFromInputEvent, revokeObjectUrl, uploadPostImage, validatePostImageFile } from "../lib/media";
 import ProfileCard from "../components/ProfileCard";
@@ -96,9 +97,36 @@ type RawManageableMembershipRow = {
   organizations: ManageableOrganization | ManageableOrganization[] | null;
 };
 
+type HomeEvent = {
+  id: number;
+  title: string;
+  event_type: string;
+  status: string;
+  starts_at: string;
+  related_organization_name: string | null;
+  opponent_name: string | null;
+};
+
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function formatEventLine(event: HomeEvent) {
+  const start = new Date(event.starts_at);
+  const formatted = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(start);
+
+  if (event.event_type === "match") {
+    return `${formatted} · ${event.related_organization_name || "Your side"} vs ${event.opponent_name || "Opponent TBD"}`;
+  }
+
+  return `${formatted} · ${event.related_organization_name || "Personal activity"}`;
 }
 
 function FeedPage() {
@@ -114,9 +142,8 @@ function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [likes, setLikes] = useState<PostLike[]>([]);
   const [comments, setComments] = useState<PostComment[]>([]);
-  const [manageableOrganizations, setManageableOrganizations] = useState<
-    ManageableOrganization[]
-  >([]);
+  const [manageableOrganizations, setManageableOrganizations] = useState<ManageableOrganization[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<HomeEvent[]>([]);
   const [selectedPublisher, setSelectedPublisher] = useState("me");
   const [newPost, setNewPost] = useState("");
   const [postImageFile, setPostImageFile] = useState<File | null>(null);
@@ -128,8 +155,8 @@ function FeedPage() {
   const [commentingPostId, setCommentingPostId] = useState<number | null>(null);
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [feedMessage, setFeedMessage] = useState('');
-  const [feedError, setFeedError] = useState('');
+  const [feedMessage, setFeedMessage] = useState("");
+  const [feedError, setFeedError] = useState("");
 
   useEffect(() => {
     async function loadFeedData() {
@@ -147,6 +174,8 @@ function FeedPage() {
         .eq("id", user.id)
         .single();
 
+      let membershipIds: number[] = [];
+
       if (error) {
         console.error("Error loading feed profile:", error.message);
       } else if (data) {
@@ -157,26 +186,26 @@ function FeedPage() {
         const { data: membershipData, error: membershipError } = await supabase
           .from("organization_members")
           .select("organization_id")
-          .eq("user_id", user.id)
-          .limit(1)
-          .maybeSingle();
+          .eq("user_id", user.id);
 
         if (membershipError) {
           console.error("Error loading membership:", membershipError.message);
         } else if (membershipData) {
-          const membership = membershipData as MembershipRow;
+          membershipIds = ((membershipData as MembershipRow[]) || []).map((row) => row.organization_id);
 
-          const { data: orgData, error: orgError } = await supabase
-            .from("organizations")
-            .select("name")
-            .eq("id", membership.organization_id)
-            .single();
+          if (membershipIds.length > 0) {
+            const { data: orgData, error: orgError } = await supabase
+              .from("organizations")
+              .select("name")
+              .eq("id", membershipIds[0])
+              .single();
 
-          if (orgError) {
-            console.error("Error loading organization:", orgError.message);
-          } else if (orgData) {
-            const org = orgData as OrganizationNameRow;
-            firstOrganization = org.name;
+            if (orgError) {
+              console.error("Error loading organization:", orgError.message);
+            } else if (orgData) {
+              const org = orgData as OrganizationNameRow;
+              firstOrganization = org.name;
+            }
           }
         }
 
@@ -192,26 +221,58 @@ function FeedPage() {
 
       const { data: manageableData, error: manageableError } = await supabase
         .from("organization_members")
-        .select(
-          "organization_id, member_role, organizations(id, name, organization_type, logo_url)"
-        )
+        .select("organization_id, member_role, organizations(id, name, organization_type, logo_url)")
         .eq("user_id", user.id)
         .in("member_role", ["owner", "admin"]);
 
       if (manageableError) {
-        console.error(
-          "Error loading manageable organizations:",
-          manageableError.message
-        );
+        console.error("Error loading manageable organizations:", manageableError.message);
         setManageableOrganizations([]);
       } else {
-        const mappedOrganizations: ManageableOrganization[] = (
-          (manageableData as RawManageableMembershipRow[]) || []
-        )
+        const mappedOrganizations: ManageableOrganization[] = (((manageableData as RawManageableMembershipRow[]) || [])
           .map((row) => firstRelation(row.organizations))
-          .filter(Boolean) as ManageableOrganization[];
+          .filter(Boolean) as ManageableOrganization[]);
 
         setManageableOrganizations(mappedOrganizations);
+      }
+
+      const ownedOrMemberOrganizations = membershipIds.length
+        ? membershipIds
+        : (((manageableData as RawManageableMembershipRow[]) || []).map((row) => row.organization_id));
+
+      const eventSelect =
+        "id, title, event_type, status, starts_at, opponent_name, related_organization:organizations!events_related_organization_id_fkey(name)";
+
+      let eventsQuery = supabase
+        .from("events")
+        .select(eventSelect)
+        .gte("starts_at", new Date().toISOString())
+        .order("starts_at", { ascending: true })
+        .limit(4);
+
+      if (ownedOrMemberOrganizations.length > 0) {
+        const ids = Array.from(new Set(ownedOrMemberOrganizations));
+        eventsQuery = eventsQuery.or(`created_by.eq.${user.id},related_organization_id.in.(${ids.join(",")})`);
+      } else {
+        eventsQuery = eventsQuery.eq("created_by", user.id);
+      }
+
+      const { data: eventsData, error: eventsError } = await eventsQuery;
+      if (eventsError) {
+        console.error("Error loading home events:", eventsError.message);
+      } else {
+        const mappedEvents: HomeEvent[] = (((eventsData as Array<{ id: number; title: string; event_type: string; status: string; starts_at: string; opponent_name: string | null; related_organization: { name: string } | { name: string }[] | null }>) || [])).map(
+          (event) => ({
+            id: event.id,
+            title: event.title,
+            event_type: event.event_type,
+            status: event.status,
+            starts_at: event.starts_at,
+            opponent_name: event.opponent_name,
+            related_organization_name: firstRelation(event.related_organization)?.name || null,
+          })
+        );
+        setUpcomingEvents(mappedEvents);
       }
 
       await Promise.all([loadPosts(), loadLikes(), loadComments()]);
@@ -270,37 +331,41 @@ function FeedPage() {
       return;
     }
 
-    const normalizedComments: PostComment[] = ((data as RawPostComment[]) || []).map(
-      (comment) => ({
-        ...comment,
-        profiles: firstRelation(comment.profiles),
-      })
-    );
+    const normalizedComments: PostComment[] = ((data as RawPostComment[]) || []).map((comment) => ({
+      ...comment,
+      profiles: firstRelation(comment.profiles),
+    }));
 
     setComments(normalizedComments);
   }
 
-  function handlePostImageChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = getFileFromInputEvent(event);
-    event.target.value = "";
+  function resetComposerState() {
+    revokeObjectUrl(postImagePreviewUrl);
+    setNewPost("");
+    setPostImageFile(null);
+    setPostImagePreviewUrl("");
+  }
 
-    if (!file) return;
+  async function handlePostImageChange(event: ChangeEvent<HTMLInputElement>) {
+    setFeedError("");
 
-    const validationError = validatePostImageFile(file);
-    if (validationError) {
-      console.error(validationError);
-      setFeedError(validationError);
-      setFeedMessage('');
+    const selected = getFileFromInputEvent(event);
+    if (!selected) {
       return;
     }
 
-    setFeedError('');
-    setFeedMessage('');
+    const validationMessage = validatePostImageFile(selected);
+    if (validationMessage) {
+      setFeedError(validationMessage);
+      event.target.value = "";
+      return;
+    }
 
     revokeObjectUrl(postImagePreviewUrl);
-    const previewUrl = URL.createObjectURL(file);
-    setPostImageFile(file);
-    setPostImagePreviewUrl(previewUrl);
+    const nextPreviewUrl = URL.createObjectURL(selected);
+    setPostImageFile(selected);
+    setPostImagePreviewUrl(nextPreviewUrl);
+    event.target.value = "";
   }
 
   function handleRemovePostImage() {
@@ -310,220 +375,210 @@ function FeedPage() {
   }
 
   async function handleCreatePost() {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to publish.');
-      setFeedMessage('');
+    const trimmedContent = newPost.trim();
+
+    if (!trimmedContent && !postImageFile) {
+      setFeedError("Write something or add an image before publishing.");
+      setFeedMessage("");
       return;
     }
 
-    if (!newPost.trim() && !postImageFile) {
-      setFeedError('Write something or add an image before publishing.');
-      setFeedMessage('');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setFeedError("You need to be signed in to post.");
+      setFeedMessage("");
       return;
     }
 
     setCreating(true);
-    setFeedError('');
-    setFeedMessage('');
+    setFeedError("");
+    setFeedMessage("");
 
-    let organizationId: number | null = null;
     let uploadedImageUrl: string | null = null;
 
-    if (selectedPublisher.startsWith("org-")) {
-      organizationId = Number(selectedPublisher.replace("org-", ""));
-    }
-
-    try {
-      if (postImageFile) {
-        uploadedImageUrl = await uploadPostImage(postImageFile, currentUserId);
-      }
-
-      const { error } = await supabase.from("posts").insert({
-        user_id: currentUserId,
-        organization_id: organizationId,
-        content: newPost.trim(),
-        image_url: uploadedImageUrl,
-      });
-
-      if (error) {
-        console.error("Error creating post:", error.message);
-        setFeedError(`Error: ${error.message}`);
+    if (postImageFile) {
+      try {
+        uploadedImageUrl = await uploadPostImage(postImageFile, user.id);
+      } catch (uploadError) {
+        setFeedError(uploadError instanceof Error ? uploadError.message : 'Could not upload the selected image.');
         setCreating(false);
         return;
       }
-
-      setNewPost("");
-      handleRemovePostImage();
-      await loadPosts();
-      setFeedMessage('Post published.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("Error creating post:", message);
-      setFeedError(`Error: ${message}`);
-    } finally {
-      setCreating(false);
     }
-  }
 
-  async function handleDeletePost(postId: number) {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to delete a post.');
+    const publisherOrganizationId = selectedPublisher.startsWith("org-")
+      ? Number(selectedPublisher.replace("org-", ""))
+      : null;
+
+    const payload = {
+      user_id: user.id,
+      organization_id: publisherOrganizationId,
+      content: trimmedContent,
+      image_url: uploadedImageUrl,
+    };
+
+    const { error } = await supabase.from("posts").insert(payload);
+
+    if (error) {
+      setFeedError(error.message);
+      setCreating(false);
       return;
     }
 
-    setDeletingPostId(postId);
-    setFeedError('');
-    setFeedMessage('');
+    resetComposerState();
+    setSelectedPublisher("me");
+    setFeedMessage("Post published.");
+    setCreating(false);
+    await loadPosts();
+  }
 
-    const { error } = await supabase
-      .from("posts")
-      .delete()
-      .eq("id", postId)
-      .eq("user_id", currentUserId);
+  async function handleDeletePost(postId: number) {
+    setDeletingPostId(postId);
+    setFeedError("");
+    setFeedMessage("");
+
+    const { error } = await supabase.from("posts").delete().eq("id", postId);
 
     if (error) {
-      console.error("Error deleting post:", error.message);
-      setFeedError(`Error: ${error.message}`);
+      setFeedError(error.message);
       setDeletingPostId(null);
       return;
     }
 
-    await Promise.all([loadPosts(), loadLikes(), loadComments()]);
-    setFeedMessage('Post deleted.');
+    setFeedMessage("Post deleted.");
     setDeletingPostId(null);
+    await Promise.all([loadPosts(), loadLikes(), loadComments()]);
   }
 
   async function handleToggleLike(postId: number) {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to like posts.');
-      return;
-    }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
 
     setLikingPostId(postId);
-    setFeedError('');
+    setFeedError("");
+    setFeedMessage("");
 
-    const existingLike = likes.find(
-      (like) => like.post_id === postId && like.user_id === currentUserId
-    );
+    const existingLike = likes.find((like) => like.post_id === postId && like.user_id === user.id);
 
     if (existingLike) {
-      const { error } = await supabase
-        .from("post_likes")
-        .delete()
-        .eq("id", existingLike.id)
-        .eq("user_id", currentUserId);
-
+      const { error } = await supabase.from("post_likes").delete().eq("id", existingLike.id);
       if (error) {
-        console.error("Error deleting like:", error.message);
-        setFeedError(`Error: ${error.message}`);
+        setFeedError(error.message);
         setLikingPostId(null);
         return;
       }
     } else {
-      const { error } = await supabase.from("post_likes").insert({
-        post_id: postId,
-        user_id: currentUserId,
-      });
-
+      const { error } = await supabase.from("post_likes").insert({ post_id: postId, user_id: user.id });
       if (error) {
-        console.error("Error creating like:", error.message);
-        setFeedError(`Error: ${error.message}`);
+        setFeedError(error.message);
         setLikingPostId(null);
         return;
       }
     }
 
-    await loadLikes();
     setLikingPostId(null);
+    await loadLikes();
   }
 
   async function handleAddComment(postId: number) {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to comment.');
-      return;
-    }
-
     const content = (commentDrafts[postId] || "").trim();
     if (!content) {
-      setFeedError('Write a comment before sending it.');
+      setFeedError("Write a comment before posting.");
+      setFeedMessage("");
       return;
     }
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
     setCommentingPostId(postId);
-    setFeedError('');
+    setFeedError("");
+    setFeedMessage("");
 
     const { error } = await supabase.from("post_comments").insert({
       post_id: postId,
-      user_id: currentUserId,
+      user_id: user.id,
       content,
     });
 
     if (error) {
-      console.error("Error creating comment:", error.message);
-      setFeedError(`Error: ${error.message}`);
-      setCommentingPostId(null);
+      setFeedError(error.message);
+      setCommentingPostId(postId);
       return;
     }
 
-    setCommentDrafts((prev) => ({
-      ...prev,
-      [postId]: "",
-    }));
-
-    await loadComments();
-    setFeedMessage('Comment added.');
+    setCommentDrafts((prev) => ({ ...prev, [postId]: "" }));
+    setFeedMessage("Comment added.");
     setCommentingPostId(null);
+    await loadComments();
   }
 
   async function handleDeleteComment(commentId: number) {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to delete comments.');
-      return;
-    }
-
     setDeletingCommentId(commentId);
-    setFeedError('');
+    setFeedError("");
+    setFeedMessage("");
 
-    const { error } = await supabase
-      .from("post_comments")
-      .delete()
-      .eq("id", commentId)
-      .eq("user_id", currentUserId);
+    const { error } = await supabase.from("post_comments").delete().eq("id", commentId);
 
     if (error) {
-      console.error("Error deleting comment:", error.message);
-      setFeedError(`Error: ${error.message}`);
+      setFeedError(error.message);
       setDeletingCommentId(null);
       return;
     }
 
-    await loadComments();
-    setFeedMessage('Comment deleted.');
+    setFeedMessage("Comment deleted.");
     setDeletingCommentId(null);
+    await loadComments();
   }
+
+  const upcomingCount = upcomingEvents.filter((event) => event.status === "scheduled").length;
 
   return (
     <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
-          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-6 py-8 text-white">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Feed</p>
-                <h1 className="mt-2 text-3xl font-bold lg:text-4xl">Show your sporting momentum</h1>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-white/75">
-                  Share images, achievements, and updates that make your sports identity more visible across Asobu.
-                </p>
+        <section className="app-hero overflow-hidden rounded-[32px] px-6 py-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Home</p>
+              <h1 className="mt-2 max-w-3xl text-3xl font-bold tracking-tight text-slate-900 lg:text-4xl">
+                Keep your sports identity active, visible, and connected.
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+                Home is your activity layer inside Asobu: share relevant updates, follow the next events in your world, and keep your profile moving forward.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link to="/profile" className="app-button-primary rounded-full px-5 py-3 text-sm font-semibold">
+                  Strengthen profile
+                </Link>
+                <Link to="/discover" className="app-button-secondary rounded-full px-5 py-3 text-sm font-semibold">
+                  Explore network
+                </Link>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
-                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
-                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Posts</p>
-                  <p className="mt-2 text-3xl font-bold">{posts.length}</p>
-                </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
-                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Organizations</p>
-                  <p className="mt-2 text-3xl font-bold">{manageableOrganizations.length}</p>
-                </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:min-w-[460px]">
+              <div className="rounded-[24px] border border-slate-200/80 bg-white/85 p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Posts</p>
+                <p className="mt-2 text-3xl font-bold text-slate-900">{posts.length}</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Updates shaping your public sports identity.</p>
+              </div>
+              <div className="rounded-[24px] border border-slate-200/80 bg-white/85 p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Managed orgs</p>
+                <p className="mt-2 text-3xl font-bold text-slate-900">{manageableOrganizations.length}</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Teams, clubs, and communities you can publish for.</p>
+              </div>
+              <div className="rounded-[24px] border border-slate-200/80 bg-white/85 p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Upcoming</p>
+                <p className="mt-2 text-3xl font-bold text-slate-900">{upcomingCount}</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Events already connected to your sporting world.</p>
               </div>
             </div>
           </div>
@@ -531,36 +586,71 @@ function FeedPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[290px_minmax(0,1fr)_300px]">
           <ProfileCard profile={profile} />
-          <FeedCard
-            posts={posts}
-            likes={likes}
-            comments={comments}
-            manageableOrganizations={manageableOrganizations}
-            selectedPublisher={selectedPublisher}
-            setSelectedPublisher={setSelectedPublisher}
-            currentProfileName={profile.name}
-            newPost={newPost}
-            setNewPost={setNewPost}
-            postImagePreviewUrl={postImagePreviewUrl}
-            postImageFileName={postImageFile?.name || ""}
-            onPostImageChange={handlePostImageChange}
-            onRemovePostImage={handleRemovePostImage}
-            onCreatePost={handleCreatePost}
-            onDeletePost={handleDeletePost}
-            onToggleLike={handleToggleLike}
-            onAddComment={handleAddComment}
-            onDeleteComment={handleDeleteComment}
-            commentDrafts={commentDrafts}
-            setCommentDrafts={setCommentDrafts}
-            creating={creating}
-            deletingPostId={deletingPostId}
-            likingPostId={likingPostId}
-            commentingPostId={commentingPostId}
-            deletingCommentId={deletingCommentId}
-            currentUserId={currentUserId}
-            message={feedMessage}
-            error={feedError}
-          />
+          <div className="space-y-6">
+            {upcomingEvents.length > 0 ? (
+              <section className="app-card rounded-[32px] p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Coming up</p>
+                    <h2 className="mt-2 text-xl font-semibold text-slate-900">Upcoming activity</h2>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      Your next visible sporting moments across personal and organization-linked events.
+                    </p>
+                  </div>
+                  <Link to="/calendar" className="app-button-secondary rounded-full px-4 py-2.5 text-sm font-medium">
+                    Open calendar
+                  </Link>
+                </div>
+                <div className="mt-5 grid gap-3">
+                  {upcomingEvents.map((event) => (
+                    <div key={event.id} className="app-card-subtle rounded-[24px] px-4 py-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="app-chip-brand rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                          {event.event_type}
+                        </span>
+                        <span className="app-chip rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                          {event.status}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-slate-900">{event.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">{formatEventLine(event)}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <FeedCard
+              posts={posts}
+              likes={likes}
+              comments={comments}
+              manageableOrganizations={manageableOrganizations}
+              selectedPublisher={selectedPublisher}
+              setSelectedPublisher={setSelectedPublisher}
+              currentProfileName={profile.name}
+              newPost={newPost}
+              setNewPost={setNewPost}
+              postImagePreviewUrl={postImagePreviewUrl}
+              postImageFileName={postImageFile?.name || ""}
+              onPostImageChange={handlePostImageChange}
+              onRemovePostImage={handleRemovePostImage}
+              onCreatePost={handleCreatePost}
+              onDeletePost={handleDeletePost}
+              onToggleLike={handleToggleLike}
+              onAddComment={handleAddComment}
+              onDeleteComment={handleDeleteComment}
+              commentDrafts={commentDrafts}
+              setCommentDrafts={setCommentDrafts}
+              creating={creating}
+              deletingPostId={deletingPostId}
+              likingPostId={likingPostId}
+              commentingPostId={commentingPostId}
+              deletingCommentId={deletingCommentId}
+              currentUserId={currentUserId}
+              message={feedMessage}
+              error={feedError}
+            />
+          </div>
           <SuggestionsCard manageableOrganizations={manageableOrganizations} />
         </div>
       </div>

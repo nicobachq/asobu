@@ -135,8 +135,8 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#07111d] text-slate-200">
-        <div className="rounded-[28px] border border-white/8 bg-white/[0.04] px-6 py-5 shadow-[0_18px_40px_rgba(0,0,0,.28)]">Loading Asobu…</div>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--asobu-background)] text-slate-700">
+        <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-[0_18px_40px_rgba(15,23,42,.08)]">Loading Asobu…</div>
       </div>
     );
   }

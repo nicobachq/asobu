@@ -159,18 +159,18 @@ function FeedCard({
   return (
     <div className="space-y-6">
       <section className="app-card overflow-hidden rounded-[32px]">
-        <div className="app-gradient-panel px-6 py-6 text-white">
+        <div className="app-gradient-panel px-6 py-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">
-                Share on Asobu
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                Publish
               </p>
-              <h2 className="mt-2 text-2xl font-bold">Build visibility with every post</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-7 text-white/75">
-                Publish as yourself or as one of your organizations. Text, images, and external media links all become part of your sports identity.
+              <h2 className="mt-2 text-2xl font-bold text-slate-900">Share what strengthens your sports identity</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
+                Publish as yourself or as one of your organizations. Text, photos, and external media links all become part of your public sporting story.
               </p>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-medium text-white/90 backdrop-blur">
+            <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
               {selectedOrganization ? `Publishing as ${selectedOrganization.name}` : `Publishing as ${currentProfileName}`}
             </div>
           </div>
@@ -185,7 +185,7 @@ function FeedCard({
               <select
                 value={selectedPublisher}
                 onChange={(e) => setSelectedPublisher(e.target.value)}
-                className="w-full rounded-2xl border border-white/8 bg-white/[0.05] px-4 py-3 text-sm outline-none focus:border-cyan-300/30"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-[var(--asobu-primary)] focus:bg-white"
               >
                 <option value="me">Me · {currentProfileName}</option>
                 {manageableOrganizations.map((organization) => (
@@ -204,7 +204,7 @@ function FeedCard({
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="Share a result, achievement, photo, YouTube link, social post, transfer update, or community news..."
-                className="min-h-[140px] w-full rounded-2xl border border-white/8 bg-white/[0.05] px-4 py-4 text-sm text-slate-100 outline-none placeholder:text-slate-400 focus:border-cyan-300/30"
+                className="min-h-[140px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--asobu-primary)] focus:bg-white"
               />
             </div>
           </div>
@@ -219,7 +219,7 @@ function FeedCard({
                     className="h-full w-full rounded-2xl object-contain p-1.5"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
+                  <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-sm font-semibold text-[var(--asobu-primary-dark)]">
                     {getInitials(selectedOrganization.name)}
                   </div>
                 )}
@@ -267,7 +267,7 @@ function FeedCard({
             )}
 
             {postImagePreviewUrl && (
-              <div className="mt-4 overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.04]">
+              <div className="mt-4 overflow-hidden rounded-[24px] border border-slate-200 bg-white">
                 <img
                   src={postImagePreviewUrl}
                   alt="Post preview"
@@ -279,7 +279,7 @@ function FeedCard({
 
           <div className="mt-5 flex items-center justify-between gap-4">
             <div className="flex flex-wrap gap-2">
-              <span className="app-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
+              <span className="app-chip-brand rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
                 Identity post
               </span>
               <span className="app-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
@@ -304,7 +304,7 @@ function FeedCard({
       </section>
 
       {posts.length === 0 ? (
-        <div className="rounded-[32px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
+        <div className="rounded-[32px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
           No posts yet.
         </div>
       ) : (
@@ -321,7 +321,7 @@ function FeedCard({
             : author?.role || "member";
 
           return (
-            <article id={`post-${post.id}`} key={post.id} className="overflow-hidden rounded-[32px] bg-white shadow-sm scroll-mt-24">
+            <article id={`post-${post.id}`} key={post.id} className="app-card overflow-hidden rounded-[32px] scroll-mt-24">
               <div className="p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-start gap-4">
@@ -333,7 +333,7 @@ function FeedCard({
                           className="h-full w-full rounded-2xl object-contain p-1.5"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
+                        <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-sm font-semibold text-[var(--asobu-primary-dark)]">
                           {getInitials(displayName)}
                         </div>
                       )}
@@ -382,7 +382,7 @@ function FeedCard({
                 </div>
               )}
 
-              <div className="border-t border-slate-100 px-6 py-5">
+              <div className="border-t border-slate-200 px-6 py-5">
                 <div className="flex items-center justify-between text-sm text-slate-500">
                   <span>{postLikes.length} likes</span>
                   <span>{postComments.length} comments</span>
@@ -449,12 +449,12 @@ function FeedCard({
                         }))
                       }
                       placeholder="Write a comment..."
-                      className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
+                      className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-[var(--asobu-primary)]"
                     />
                     <button type="button"
                       onClick={() => onAddComment(post.id)}
                       disabled={commentingPostId === post.id || !(commentDrafts[post.id] || "").trim()}
-                      className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                      className="app-button-primary rounded-full px-5 py-3 text-sm font-semibold disabled:opacity-50"
                     >
                       {commentingPostId === post.id ? "..." : "Comment"}
                     </button>

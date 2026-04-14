@@ -64,8 +64,8 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
     <article className="app-card rounded-[28px] p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 gap-4">
-          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-[linear-gradient(160deg,rgba(9,17,31,.98),rgba(18,31,50,.98))] text-center text-white ring-1 ring-white/8">
-            <span className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Date</span>
+          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-center text-[var(--asobu-foreground)]">
+            <span className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Date</span>
             <span className="text-sm font-semibold">{formatEventDateBadge(event.starts_at)}</span>
           </div>
 
@@ -99,7 +99,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
                   {primaryOrganization ? (
                     <Link
                       to={`/organizations/${primaryOrganization.id}`}
-                      className="font-medium text-slate-900 transition hover:text-slate-700"
+                      className="font-medium text-slate-900 transition hover:text-[var(--asobu-primary-dark)]"
                     >
                       {yourSideLabel}
                     </Link>
@@ -110,7 +110,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
                   {secondaryOrganization ? (
                     <Link
                       to={`/organizations/${secondaryOrganization.id}`}
-                      className="font-medium text-slate-900 transition hover:text-slate-700"
+                      className="font-medium text-slate-900 transition hover:text-[var(--asobu-primary-dark)]"
                     >
                       {opponentLabel}
                     </Link>
@@ -118,7 +118,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
                     <span className="font-medium text-slate-900">{opponentLabel}</span>
                   )}
                   {hasScore ? (
-                    <span className="rounded-full bg-[linear-gradient(135deg,rgba(45,212,191,.22),rgba(245,158,11,.18))] px-3 py-1 text-sm font-semibold text-white ring-1 ring-white/8">
+                    <span className="rounded-full bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_16%,white_84%))] px-3 py-1 text-sm font-semibold text-[var(--asobu-foreground)]">
                       {event.score_for} - {event.score_against}
                     </span>
                   ) : null}
@@ -136,7 +136,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
                   href={mapsUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-medium text-slate-700 transition hover:text-slate-900"
+                  className="font-medium text-[var(--asobu-primary-dark)] transition hover:text-[var(--asobu-primary)]"
                 >
                   Open in Maps
                 </a>
@@ -170,7 +170,7 @@ function EventCard({ event, currentUserId, onDelete, onEdit, perspectiveOrganiza
               <button
                 type="button"
                 onClick={() => onDelete(event.id)}
-                className="rounded-full border border-rose-300/15 bg-rose-400/8 px-4 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/14"
+                className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-100"
               >
                 Delete
               </button>
