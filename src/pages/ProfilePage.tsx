@@ -216,6 +216,15 @@ function formatHistoryPeriod(entry: SportingHistoryEntry) {
   return 'Period not specified';
 }
 
+function CameraIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.7a1.5 1.5 0 0 0 1.2-.6l.7-.9A1.5 1.5 0 0 1 11.3 4h1.4a1.5 1.5 0 0 1 1.2.6l.7.9a1.5 1.5 0 0 0 1.2.6h1.7A2.5 2.5 0 0 1 20 8.5v7A2.5 2.5 0 0 1 17.5 18h-11A2.5 2.5 0 0 1 4 15.5v-7Z" />
+      <circle cx="12" cy="12" r="3.25" />
+    </svg>
+  );
+}
+
 function ProfilePage() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -268,6 +277,7 @@ function ProfilePage() {
   const [message, setMessage] = useState('');
   const [orgMessage, setOrgMessage] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [openMediaMenu, setOpenMediaMenu] = useState<'avatar' | 'banner' | null>(null);
 
   const selectedRoleValues = useMemo(
     () =>
@@ -692,6 +702,7 @@ function ProfilePage() {
     setProfileAvatarUrl('');
     setAvatarPreviewUrl(nextPreviewUrl);
     setMessage('');
+    setOpenMediaMenu(null);
   }
 
   function handleCoverFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -712,6 +723,7 @@ function ProfilePage() {
     setProfileCoverImageUrl('');
     setCoverPreviewUrl(nextPreviewUrl);
     setMessage('');
+    setOpenMediaMenu(null);
   }
 
   function handleRemoveAvatar() {
@@ -719,6 +731,7 @@ function ProfilePage() {
     setAvatarFile(null);
     setProfileAvatarUrl('');
     setAvatarPreviewUrl('');
+    setOpenMediaMenu(null);
   }
 
   function handleRemoveCover() {
@@ -726,15 +739,18 @@ function ProfilePage() {
     setCoverFile(null);
     setProfileCoverImageUrl('');
     setCoverPreviewUrl('');
+    setOpenMediaMenu(null);
   }
 
   function handleStartProfileEdit() {
     setMessage('');
+    setOpenMediaMenu(null);
     setIsEditingProfile(true);
   }
 
   function handleCancelProfileEdit() {
     setMessage('');
+    setOpenMediaMenu(null);
     setIsEditingProfile(false);
     setFullName(profile?.full_name || '');
     setLocation(profile?.location || '');
@@ -834,6 +850,7 @@ function ProfilePage() {
     setCoverPreviewUrl(nextCoverImageUrl || '');
     setAvatarFile(null);
     setCoverFile(null);
+    setOpenMediaMenu(null);
     setMessage('Profile updated successfully.');
     setIsEditingProfile(false);
     setSaving(false);
@@ -1130,6 +1147,8 @@ function ProfilePage() {
     hasCompleteSkillIdentity(activeSkillTemplate, skillEntries as SkillEntryValue[]);
 
   const isSkillIdentityLocked = hasSavedSportSpecificSkills;
+  const hasAvatarMedia = Boolean((avatarPreviewUrl || '').trim());
+  const hasCoverMedia = Boolean((coverPreviewUrl || '').trim());
 
   if (!profile) {
     return (
@@ -1144,7 +1163,7 @@ function ProfilePage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
           <div
-            className="h-56 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+            className="group relative h-56 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
             style={
               coverPreviewUrl
                 ? {
@@ -1154,16 +1173,77 @@ function ProfilePage() {
                   }
                 : undefined
             }
-          />
+          >
+            {isEditingProfile && (
+              <>
+                <input id="profile-banner-input" type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
+                <div className="absolute right-4 top-4">
+                  <button
+                    type="button"
+                    onClick={() => setOpenMediaMenu((current) => (current === 'banner' ? null : 'banner'))}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-800 shadow-lg backdrop-blur transition hover:bg-white md:opacity-0 md:group-hover:opacity-100"
+                    aria-label="Edit banner"
+                  >
+                    <CameraIcon />
+                  </button>
+                  {openMediaMenu === 'banner' && (
+                    <div className="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                      <label htmlFor="profile-banner-input" className="block cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        Change banner
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCover}
+                        disabled={!hasCoverMedia && !coverFile}
+                        className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Remove banner
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="p-6">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div className="flex-1">
-                <div className="-mt-20 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
+                <div className="group relative -mt-20 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
                   {avatarPreviewUrl ? (
                     <img src={avatarPreviewUrl} alt={profile.full_name || fullName || 'Asobu User'} className="h-full w-full object-cover" />
                   ) : (
                     getInitials(profile.full_name || fullName || 'Asobu User')
+                  )}
+                  {isEditingProfile && (
+                    <>
+                      <input id="profile-avatar-input" type="file" accept="image/*" className="hidden" onChange={handleAvatarFileChange} />
+                      <div className="absolute bottom-1 right-1">
+                        <button
+                          type="button"
+                          onClick={() => setOpenMediaMenu((current) => (current === 'avatar' ? null : 'avatar'))}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/92 text-slate-800 shadow-lg backdrop-blur transition hover:bg-white md:opacity-0 md:group-hover:opacity-100"
+                          aria-label="Edit profile photo"
+                        >
+                          <CameraIcon />
+                        </button>
+                        {openMediaMenu === 'avatar' && (
+                          <div className="absolute right-0 top-12 z-10 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                            <label htmlFor="profile-avatar-input" className="block cursor-pointer rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                              Change photo
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleRemoveAvatar}
+                              disabled={!hasAvatarMedia && !avatarFile}
+                              className="mt-1 block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Remove photo
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -1228,22 +1308,10 @@ function ProfilePage() {
                   >
                     View public profile
                   </Link>
-                  {isEditingProfile ? (
-                    <button
-                      type="button"
-                      onClick={handleCancelProfileEdit}
-                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      Cancel editing
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleStartProfileEdit}
-                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      Edit profile
-                    </button>
+                  {isEditingProfile && (
+                    <span className="inline-flex items-center justify-center rounded-2xl border border-[color:color-mix(in_oklab,var(--asobu-primary)_20%,white_80%)] bg-[color:color-mix(in_oklab,var(--asobu-primary)_10%,white_90%)] px-4 py-3 text-sm font-medium text-[var(--asobu-primary-dark)]">
+                      Edit mode active
+                    </span>
                   )}
                 </div>
               </div>
@@ -1294,100 +1362,56 @@ function ProfilePage() {
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
             <section className="rounded-3xl bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Profile basics</h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
                     Keep your profile structured and standardized so scouts, coaches, and organizations can compare people more clearly.
                   </p>
+                  {isEditingProfile && (
+                    <p className="mt-3 text-xs font-medium text-slate-500">Use the camera icons on your photo and banner to change or remove them.</p>
+                  )}
                 </div>
-                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${isEditingProfile ? 'bg-[color:color-mix(in_oklab,var(--asobu-primary)_14%,white_86%)] text-[var(--asobu-primary-dark)]' : 'bg-slate-100 text-slate-600'}`}>
-                  {isEditingProfile ? 'Editing profile' : 'View mode'}
-                </span>
-              </div>
-
-              <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <p className="text-sm font-semibold text-slate-900">Profile photo</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Your photo appears in your profile, discover cards, and other identity surfaces.
-                  </p>
-                  <div className="mt-5 flex items-center gap-4">
-                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-2xl font-semibold text-[var(--asobu-primary-dark)] shadow-sm">
-                      {avatarPreviewUrl ? (
-                        <img src={avatarPreviewUrl} alt={profile.full_name || fullName || 'Asobu User'} className="h-full w-full object-cover" />
-                      ) : (
-                        getInitials(profile.full_name || fullName || 'Asobu User')
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      {isEditingProfile ? (
-                        <>
-                          <label className="app-button-primary inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-2 text-sm font-semibold">
-                            Choose photo
-                            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFileChange} />
-                          </label>
-                          <button type="button" onClick={handleRemoveAvatar} className="app-button-secondary rounded-full px-4 py-2 text-sm font-medium">
-                            Remove
-                          </button>
-                        </>
-                      ) : (
-                        <span className="rounded-full bg-white px-4 py-2 text-center text-sm font-medium text-slate-500">
-                          Edit mode required
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {avatarFile && <p className="mt-3 text-xs text-slate-500">{avatarFile.name}</p>}
-                </div>
-
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">Profile banner</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        Add a wide image so your profile feels more complete and distinctive when shared publicly.
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      {isEditingProfile ? (
-                        <>
-                          <label className="app-button-primary inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-2 text-sm font-semibold">
-                            Choose banner
-                            <input type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
-                          </label>
-                          <button type="button" onClick={handleRemoveCover} className="app-button-secondary rounded-full px-4 py-2 text-sm font-medium">
-                            Remove
-                          </button>
-                        </>
-                      ) : (
-                        <span className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-500">Edit mode required</span>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    className="mt-5 h-40 rounded-[24px] border border-dashed border-slate-200 bg-gradient-to-br from-white via-[color:color-mix(in_oklab,var(--asobu-primary)_10%,white_90%)] to-[color:color-mix(in_oklab,var(--asobu-warm)_10%,white_90%)]"
-                    style={
-                      coverPreviewUrl
-                        ? {
-                            backgroundImage: `linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)), url(${coverPreviewUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                          }
-                        : undefined
-                    }
-                  />
-                  {coverFile && <p className="mt-3 text-xs text-slate-500">{coverFile.name}</p>}
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${isEditingProfile ? 'bg-[color:color-mix(in_oklab,var(--asobu-primary)_14%,white_86%)] text-[var(--asobu-primary-dark)]' : 'bg-slate-100 text-slate-600'}`}>
+                    {isEditingProfile ? 'Editing profile' : 'View mode'}
+                  </span>
+                  {isEditingProfile ? (
+                    <>
+                      <button
+                        type="submit"
+                        form="profile-basics-form"
+                        disabled={saving}
+                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {saving ? 'Saving...' : 'Save changes'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelProfileEdit}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStartProfileEdit}
+                      className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                      Edit profile
+                    </button>
+                  )}
                 </div>
               </div>
-
-              <p className="mt-4 text-xs font-medium text-slate-500">
+              <div className="mt-6 rounded-[24px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
                 {isEditingProfile
-                  ? 'Photo and banner changes are saved together with your profile update below.'
-                  : 'Start edit mode to change your photo, banner, or identity details.'}
-              </p>
+                  ? 'Edit your core identity below. Use the camera icons on the banner and profile photo to manage images.'
+                  : 'Start edit mode to update your identity details and media.'}
+              </div>
 
-              <form onSubmit={handleSave} className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <form id="profile-basics-form" onSubmit={handleSave} className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Full name</label>
                   <input
@@ -1466,35 +1490,6 @@ function ProfilePage() {
                       );
                     })}
                   </div>
-                </div>
-
-                <div className="lg:col-span-2 flex flex-wrap gap-3">
-                  {isEditingProfile ? (
-                    <>
-                      <button
-                        type="submit"
-                        disabled={saving}
-                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                      >
-                        {saving ? 'Saving...' : 'Save changes'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelProfileEdit}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleStartProfileEdit}
-                      className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
-                    >
-                      Edit profile
-                    </button>
-                  )}
                 </div>
 
                 {message && <p className="lg:col-span-2 text-sm text-slate-600">{message}</p>}
