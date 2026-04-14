@@ -42,9 +42,18 @@ export const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
 ];
 
 export const EVENT_VISIBILITY_OPTIONS: { value: EventVisibility; label: string; description: string }[] = [
-  { value: 'public', label: 'Public', description: 'Visible to everyone in Asobu and ready for public-facing organization/event layers later.' },
+  { value: 'public', label: 'Public', description: 'Visible to everyone in Asobu and ready for public-facing organization and event layers later.' },
   { value: 'private', label: 'Private', description: 'Visible only inside your own Asobu access.' },
 ];
+
+export const CALENDAR_VIEW_OPTIONS = [
+  { value: 'calendar', label: 'Calendar' },
+  { value: 'list', label: 'List' },
+] as const;
+
+export type CalendarView = (typeof CALENDAR_VIEW_OPTIONS)[number]['value'];
+
+export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export function getEventTypeLabel(value: string | null | undefined) {
   return EVENT_TYPE_OPTIONS.find((option) => option.value === value)?.label || 'Event';
@@ -155,4 +164,68 @@ export function getEventTypeClasses(type: string | null | undefined) {
   }
 
   return 'bg-slate-100 text-slate-700';
+}
+
+export function createTimeOptions(stepMinutes = 15) {
+  const options: string[] = [];
+
+  for (let minutes = 0; minutes < 24 * 60; minutes += stepMinutes) {
+    const hours = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const mins = String(minutes % 60).padStart(2, '0');
+    options.push(`${hours}:${mins}`);
+  }
+
+  return options;
+}
+
+export function extractDateParts(datetimeLocalValue: string) {
+  if (!datetimeLocalValue) {
+    return { date: '', time: '' };
+  }
+
+  const [date, time = ''] = datetimeLocalValue.split('T');
+  return { date, time: time.slice(0, 5) };
+}
+
+export function combineLocalDateAndTime(date: string, time: string) {
+  if (!date || !time) {
+    return null;
+  }
+
+  return new Date(`${date}T${time}`).toISOString();
+}
+
+export function getCalendarDateKey(value: Date | string) {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getMonthLabel(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+}
+
+export function getMonthGridDates(monthDate: Date) {
+  const startOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const startWeekday = (startOfMonth.getDay() + 6) % 7;
+  const gridStart = new Date(startOfMonth);
+  gridStart.setDate(startOfMonth.getDate() - startWeekday);
+
+  const dates: Date[] = [];
+  for (let index = 0; index < 42; index += 1) {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    dates.push(date);
+  }
+
+  return dates;
+}
+
+export function isSameCalendarDay(a: Date | string, b: Date | string) {
+  return getCalendarDateKey(a) === getCalendarDateKey(b);
 }

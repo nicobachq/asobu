@@ -9,6 +9,12 @@ import {
   getEventTypeLabel,
 } from '../lib/events';
 
+type LinkedOrganization = {
+  id: number;
+  name: string;
+  organization_type: string | null;
+};
+
 type EventCardProps = {
   event: {
     id: number;
@@ -26,11 +32,8 @@ type EventCardProps = {
     score_for: number | null;
     score_against: number | null;
     created_by: string;
-    organizations?: {
-      id: number;
-      name: string;
-      organization_type: string | null;
-    } | null;
+    related_organization?: LinkedOrganization | null;
+    opponent_organization?: LinkedOrganization | null;
   };
   currentUserId?: string | null;
   onDelete?: (eventId: number) => void;
@@ -42,6 +45,9 @@ function EventCard({ event, currentUserId, onDelete }: EventCardProps) {
   const hasScore =
     typeof event.score_for === 'number' && !Number.isNaN(event.score_for) &&
     typeof event.score_against === 'number' && !Number.isNaN(event.score_against);
+
+  const yourSideLabel = event.related_organization?.name || 'Your side';
+  const opponentLabel = event.opponent_organization?.name || event.opponent_name || 'Opponent TBD';
 
   return (
     <article className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -79,9 +85,27 @@ function EventCard({ event, currentUserId, onDelete }: EventCardProps) {
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Match details</p>
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-700">
-                  <span>{event.organizations?.name || 'Your side'}</span>
+                  {event.related_organization ? (
+                    <Link
+                      to={`/organizations/${event.related_organization.id}`}
+                      className="font-medium text-slate-900 transition hover:text-slate-700"
+                    >
+                      {yourSideLabel}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-slate-900">{yourSideLabel}</span>
+                  )}
                   <span className="text-slate-400">vs</span>
-                  <span>{event.opponent_name || 'Opponent TBD'}</span>
+                  {event.opponent_organization ? (
+                    <Link
+                      to={`/organizations/${event.opponent_organization.id}`}
+                      className="font-medium text-slate-900 transition hover:text-slate-700"
+                    >
+                      {opponentLabel}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-slate-900">{opponentLabel}</span>
+                  )}
                   {hasScore ? (
                     <span className="rounded-full bg-slate-900 px-3 py-1 text-sm font-semibold text-white">
                       {event.score_for} - {event.score_against}
@@ -96,12 +120,12 @@ function EventCard({ event, currentUserId, onDelete }: EventCardProps) {
 
             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
               {event.location ? <span>Location: {event.location}</span> : null}
-              {event.organizations ? (
+              {event.related_organization ? (
                 <Link
-                  to={`/organizations/${event.organizations.id}`}
+                  to={`/organizations/${event.related_organization.id}`}
                   className="text-slate-700 transition hover:text-slate-900"
                 >
-                  Related organization: {event.organizations.name} · {formatOrganizationTypeLabel(event.organizations.organization_type)}
+                  Related organization: {event.related_organization.name} · {formatOrganizationTypeLabel(event.related_organization.organization_type)}
                 </Link>
               ) : null}
             </div>
