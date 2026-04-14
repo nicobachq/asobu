@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import SkillRadarChart from '../components/SkillRadarChart';
 import SkillValueBar from '../components/SkillValueBar';
@@ -32,6 +32,13 @@ import {
   getPositionOptionsForSport,
 } from '../lib/positions';
 import { getPrimarySportLabelFromValue, SPORT_REGISTRATION_OPTIONS } from '../lib/sports';
+import {
+  MAX_PROFILE_AVATAR_SIZE_BYTES,
+  MAX_PROFILE_BANNER_SIZE_BYTES,
+  revokeObjectUrl,
+  uploadProfileMedia,
+  validateImageFile,
+} from '../lib/media';
 import { supabase } from '../lib/supabase';
 
 type Profile = {
@@ -40,6 +47,8 @@ type Profile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
+  avatar_url?: string | null;
+  cover_image_url?: string | null;
   created_at: string | null;
 };
 
@@ -216,10 +225,20 @@ function ProfilePage() {
   const [fullName, setFullName] = useState('');
   const [location, setLocation] = useState('');
   const [mainSport, setMainSport] = useState('');
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState('');
+  const [profileCoverImageUrl, setProfileCoverImageUrl] = useState('');
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<RoleSelectionState>(
     buildRoleSelectionMap(['player'])
   );
   const [primaryRole, setPrimaryRole] = useState<PersonRole>('player');
+  const [savedRoleSelection, setSavedRoleSelection] = useState<RoleSelectionState>(
+    buildRoleSelectionMap(['player'])
+  );
+  const [savedPrimaryRole, setSavedPrimaryRole] = useState<PersonRole>('player');
 
   const [orgName, setOrgName] = useState('');
   const [orgType, setOrgType] = useState<OrganizationRegistrationType>('team');
@@ -248,6 +267,7 @@ function ProfilePage() {
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [message, setMessage] = useState('');
   const [orgMessage, setOrgMessage] = useState('');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   const selectedRoleValues = useMemo(
     () =>
@@ -256,6 +276,13 @@ function ProfilePage() {
       ),
     [selectedRoles]
   );
+
+  useEffect(() => {
+    return () => {
+      revokeObjectUrl(avatarPreviewUrl);
+      revokeObjectUrl(coverPreviewUrl);
+    };
+  }, [avatarPreviewUrl, coverPreviewUrl]);
 
   const historyPositionOptions = useMemo(
     () => getPositionOptionsForSport(historyForm.sport || profile?.main_sport || mainSport || null),
@@ -385,6 +412,10 @@ function ProfilePage() {
         setFullName(typedProfile.full_name || '');
         setLocation(typedProfile.location || '');
         setMainSport(typedProfile.main_sport || '');
+        setProfileAvatarUrl(typedProfile.avatar_url || '');
+        setProfileCoverImageUrl(typedProfile.cover_image_url || '');
+        setAvatarPreviewUrl(typedProfile.avatar_url || '');
+        setCoverPreviewUrl(typedProfile.cover_image_url || '');
         setHistoryForm((current) => ({
           ...current,
           sport: current.sport || typedProfile.main_sport || '',
@@ -422,8 +453,11 @@ function ProfilePage() {
     if (error) {
       console.warn('profile_roles unavailable, falling back to profile.role:', error.message);
       const fallbackPrimary = getUniquePersonRoles([currentProfile.role])[0] || 'player';
-      setSelectedRoles(buildRoleSelectionMap([fallbackPrimary]));
+      const fallbackSelection = buildRoleSelectionMap([fallbackPrimary]);
+      setSelectedRoles(fallbackSelection);
+      setSavedRoleSelection(fallbackSelection);
       setPrimaryRole(fallbackPrimary);
+      setSavedPrimaryRole(fallbackPrimary);
       return;
     }
 
@@ -437,8 +471,11 @@ function ProfilePage() {
     const primaryFromTable = typedRoles.find((item) => item.is_primary)?.role as PersonRole | undefined;
     const safePrimary = primaryFromTable && safeRoles.includes(primaryFromTable) ? primaryFromTable : safeRoles[0];
 
-    setSelectedRoles(buildRoleSelectionMap(safeRoles));
+    const nextSelection = buildRoleSelectionMap(safeRoles);
+    setSelectedRoles(nextSelection);
+    setSavedRoleSelection(nextSelection);
     setPrimaryRole(safePrimary);
+    setSavedPrimaryRole(safePrimary);
   }
 
   async function loadOrganizations(userId: string) {
@@ -636,6 +673,85 @@ function ProfilePage() {
     });
   }
 
+
+  function handleAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+
+    const validationError = validateImageFile(file, MAX_PROFILE_AVATAR_SIZE_BYTES, 'Profile photo');
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
+
+    revokeObjectUrl(avatarPreviewUrl);
+    const nextPreviewUrl = URL.createObjectURL(file);
+    setAvatarFile(file);
+    setProfileAvatarUrl('');
+    setAvatarPreviewUrl(nextPreviewUrl);
+    setMessage('');
+  }
+
+  function handleCoverFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+
+    const validationError = validateImageFile(file, MAX_PROFILE_BANNER_SIZE_BYTES, 'Profile banner');
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
+
+    revokeObjectUrl(coverPreviewUrl);
+    const nextPreviewUrl = URL.createObjectURL(file);
+    setCoverFile(file);
+    setProfileCoverImageUrl('');
+    setCoverPreviewUrl(nextPreviewUrl);
+    setMessage('');
+  }
+
+  function handleRemoveAvatar() {
+    revokeObjectUrl(avatarPreviewUrl);
+    setAvatarFile(null);
+    setProfileAvatarUrl('');
+    setAvatarPreviewUrl('');
+  }
+
+  function handleRemoveCover() {
+    revokeObjectUrl(coverPreviewUrl);
+    setCoverFile(null);
+    setProfileCoverImageUrl('');
+    setCoverPreviewUrl('');
+  }
+
+  function handleStartProfileEdit() {
+    setMessage('');
+    setIsEditingProfile(true);
+  }
+
+  function handleCancelProfileEdit() {
+    setMessage('');
+    setIsEditingProfile(false);
+    setFullName(profile?.full_name || '');
+    setLocation(profile?.location || '');
+    setMainSport(profile?.main_sport || '');
+    setSelectedRoles(savedRoleSelection);
+    setPrimaryRole(savedPrimaryRole);
+
+    revokeObjectUrl(avatarPreviewUrl);
+    revokeObjectUrl(coverPreviewUrl);
+    setAvatarFile(null);
+    setCoverFile(null);
+    setProfileAvatarUrl(profile?.avatar_url || '');
+    setProfileCoverImageUrl(profile?.cover_image_url || '');
+    setAvatarPreviewUrl(profile?.avatar_url || '');
+    setCoverPreviewUrl(profile?.cover_image_url || '');
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
 
@@ -644,6 +760,23 @@ function ProfilePage() {
     setSaving(true);
     setMessage('');
 
+    let nextAvatarUrl: string | null = profileAvatarUrl.trim() || null;
+    let nextCoverImageUrl: string | null = profileCoverImageUrl.trim() || null;
+
+    try {
+      if (avatarFile) {
+        nextAvatarUrl = await uploadProfileMedia(avatarFile, profileId, 'avatar');
+      }
+
+      if (coverFile) {
+        nextCoverImageUrl = await uploadProfileMedia(coverFile, profileId, 'banner');
+      }
+    } catch (uploadError) {
+      setMessage(uploadError instanceof Error ? `Error: ${uploadError.message}` : 'Error uploading profile media.');
+      setSaving(false);
+      return;
+    }
+
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -651,6 +784,8 @@ function ProfilePage() {
         role: primaryRole,
         location,
         main_sport: mainSport,
+        avatar_url: nextAvatarUrl,
+        cover_image_url: nextCoverImageUrl,
       })
       .eq('id', profileId);
 
@@ -686,10 +821,21 @@ function ProfilePage() {
             role: primaryRole,
             location,
             main_sport: mainSport,
+            avatar_url: nextAvatarUrl,
+            cover_image_url: nextCoverImageUrl,
           }
         : prev
     );
+    setSavedRoleSelection(buildRoleSelectionMap(selectedRoleValues));
+    setSavedPrimaryRole(primaryRole);
+    setProfileAvatarUrl(nextAvatarUrl || '');
+    setProfileCoverImageUrl(nextCoverImageUrl || '');
+    setAvatarPreviewUrl(nextAvatarUrl || '');
+    setCoverPreviewUrl(nextCoverImageUrl || '');
+    setAvatarFile(null);
+    setCoverFile(null);
     setMessage('Profile updated successfully.');
+    setIsEditingProfile(false);
     setSaving(false);
   }
 
@@ -955,6 +1101,8 @@ function ProfilePage() {
     Boolean((profile?.full_name || fullName).trim()),
     Boolean((profile?.location || location).trim()),
     Boolean((profile?.main_sport || mainSport).trim()),
+    Boolean((avatarPreviewUrl || '').trim()),
+    Boolean((coverPreviewUrl || '').trim()),
     selectedRoleValues.length > 0,
     organizations.length > 0,
     historyEntries.length > 0,
@@ -969,6 +1117,8 @@ function ProfilePage() {
     !(profile?.full_name || fullName).trim() && 'Add your full name',
     !(profile?.location || location).trim() && 'Add your location',
     !(profile?.main_sport || mainSport).trim() && 'Choose your main sport',
+    !(avatarPreviewUrl || '').trim() && 'Add a profile photo',
+    !(coverPreviewUrl || '').trim() && 'Add a profile banner',
     selectedRoleValues.length === 0 && 'Add at least one role',
     organizations.length === 0 && 'Join or create an organization',
     historyEntries.length === 0 && 'Add your sporting history',
@@ -993,13 +1143,28 @@ function ProfilePage() {
     <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
-          <div className="h-56 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500" />
+          <div
+            className="h-56 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+            style={
+              coverPreviewUrl
+                ? {
+                    backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.28), rgba(15, 23, 42, 0.10)), url(${coverPreviewUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }
+                : undefined
+            }
+          />
 
           <div className="p-6">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div className="flex-1">
-                <div className="-mt-20 flex h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
-                  {getInitials(profile.full_name || fullName || 'Asobu User')}
+                <div className="-mt-20 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-slate-900 text-3xl font-semibold text-white shadow-md">
+                  {avatarPreviewUrl ? (
+                    <img src={avatarPreviewUrl} alt={profile.full_name || fullName || 'Asobu User'} className="h-full w-full object-cover" />
+                  ) : (
+                    getInitials(profile.full_name || fullName || 'Asobu User')
+                  )}
                 </div>
 
                 <h1 className="mt-4 text-3xl font-bold text-slate-900">
@@ -1063,6 +1228,23 @@ function ProfilePage() {
                   >
                     View public profile
                   </Link>
+                  {isEditingProfile ? (
+                    <button
+                      type="button"
+                      onClick={handleCancelProfileEdit}
+                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Cancel editing
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStartProfileEdit}
+                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Edit profile
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1119,7 +1301,91 @@ function ProfilePage() {
                     Keep your profile structured and standardized so scouts, coaches, and organizations can compare people more clearly.
                   </p>
                 </div>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${isEditingProfile ? 'bg-[color:color-mix(in_oklab,var(--asobu-primary)_14%,white_86%)] text-[var(--asobu-primary-dark)]' : 'bg-slate-100 text-slate-600'}`}>
+                  {isEditingProfile ? 'Editing profile' : 'View mode'}
+                </span>
               </div>
+
+              <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">Profile photo</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Your photo appears in your profile, discover cards, and other identity surfaces.
+                  </p>
+                  <div className="mt-5 flex items-center gap-4">
+                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-2xl font-semibold text-[var(--asobu-primary-dark)] shadow-sm">
+                      {avatarPreviewUrl ? (
+                        <img src={avatarPreviewUrl} alt={profile.full_name || fullName || 'Asobu User'} className="h-full w-full object-cover" />
+                      ) : (
+                        getInitials(profile.full_name || fullName || 'Asobu User')
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {isEditingProfile ? (
+                        <>
+                          <label className="app-button-primary inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-2 text-sm font-semibold">
+                            Choose photo
+                            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFileChange} />
+                          </label>
+                          <button type="button" onClick={handleRemoveAvatar} className="app-button-secondary rounded-full px-4 py-2 text-sm font-medium">
+                            Remove
+                          </button>
+                        </>
+                      ) : (
+                        <span className="rounded-full bg-white px-4 py-2 text-center text-sm font-medium text-slate-500">
+                          Edit mode required
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {avatarFile && <p className="mt-3 text-xs text-slate-500">{avatarFile.name}</p>}
+                </div>
+
+                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Profile banner</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">
+                        Add a wide image so your profile feels more complete and distinctive when shared publicly.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {isEditingProfile ? (
+                        <>
+                          <label className="app-button-primary inline-flex cursor-pointer items-center justify-center rounded-full px-4 py-2 text-sm font-semibold">
+                            Choose banner
+                            <input type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
+                          </label>
+                          <button type="button" onClick={handleRemoveCover} className="app-button-secondary rounded-full px-4 py-2 text-sm font-medium">
+                            Remove
+                          </button>
+                        </>
+                      ) : (
+                        <span className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-500">Edit mode required</span>
+                      )}
+                    </div>
+                  </div>
+                  <div
+                    className="mt-5 h-40 rounded-[24px] border border-dashed border-slate-200 bg-gradient-to-br from-white via-[color:color-mix(in_oklab,var(--asobu-primary)_10%,white_90%)] to-[color:color-mix(in_oklab,var(--asobu-warm)_10%,white_90%)]"
+                    style={
+                      coverPreviewUrl
+                        ? {
+                            backgroundImage: `linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)), url(${coverPreviewUrl})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                          }
+                        : undefined
+                    }
+                  />
+                  {coverFile && <p className="mt-3 text-xs text-slate-500">{coverFile.name}</p>}
+                </div>
+              </div>
+
+              <p className="mt-4 text-xs font-medium text-slate-500">
+                {isEditingProfile
+                  ? 'Photo and banner changes are saved together with your profile update below.'
+                  : 'Start edit mode to change your photo, banner, or identity details.'}
+              </p>
 
               <form onSubmit={handleSave} className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div>
@@ -1128,7 +1394,8 @@ function ProfilePage() {
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none ${isEditingProfile ? 'border-slate-200 bg-slate-50 focus:border-slate-300' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                   />
                 </div>
 
@@ -1138,7 +1405,8 @@ function ProfilePage() {
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none ${isEditingProfile ? 'border-slate-200 bg-slate-50 focus:border-slate-300' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                     placeholder="Lugano, Switzerland"
                   />
                 </div>
@@ -1148,7 +1416,8 @@ function ProfilePage() {
                   <select
                     value={mainSport}
                     onChange={(e) => setMainSport(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none ${isEditingProfile ? 'border-slate-200 bg-slate-50 focus:border-slate-300' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                   >
                     <option value="">Choose a sport</option>
                     {SPORT_REGISTRATION_OPTIONS.map((sport) => (
@@ -1164,7 +1433,8 @@ function ProfilePage() {
                   <select
                     value={primaryRole}
                     onChange={(e) => setPrimaryRole(e.target.value as PersonRole)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
+                    disabled={!isEditingProfile}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none ${isEditingProfile ? 'border-slate-200 bg-slate-50 focus:border-slate-300' : 'border-slate-100 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
                   >
                     {selectedRoleValues.map((role) => (
                       <option key={role} value={role}>
@@ -1184,7 +1454,8 @@ function ProfilePage() {
                           key={roleOption.value}
                           type="button"
                           onClick={() => handleRoleToggle(roleOption.value)}
-                          className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                          disabled={!isEditingProfile}
+                          className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${!isEditingProfile ? 'cursor-not-allowed opacity-60 ' : ''}${
                             isSelected
                               ? 'border-slate-900 bg-slate-900 text-white'
                               : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
@@ -1198,13 +1469,32 @@ function ProfilePage() {
                 </div>
 
                 <div className="lg:col-span-2 flex flex-wrap gap-3">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                  >
-                    {saving ? 'Saving...' : 'Save profile'}
-                  </button>
+                  {isEditingProfile ? (
+                    <>
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {saving ? 'Saving...' : 'Save changes'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelProfileEdit}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStartProfileEdit}
+                      className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                      Edit profile
+                    </button>
+                  )}
                 </div>
 
                 {message && <p className="lg:col-span-2 text-sm text-slate-600">{message}</p>}
