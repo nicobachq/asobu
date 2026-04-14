@@ -7,6 +7,7 @@ import DiscoverPage from "./pages/DiscoverPage";
 import ProfilePage from "./pages/ProfilePage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import MessagesPage from "./pages/MessagesPage";
+import CalendarPage from "./pages/CalendarPage";
 import AuthPage from "./pages/AuthPage";
 import LandingPage from "./pages/LandingPage";
 import OrganizationPage from "./pages/OrganizationPage";
@@ -162,6 +163,7 @@ function App() {
         <Route path="/discover" element={<DiscoverPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profiles/:id" element={<PublicProfilePage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/messages/:conversationId" element={<MessagesPage />} />
         <Route path="/organizations" element={<OrganizationsListPage />} />

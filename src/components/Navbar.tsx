@@ -30,6 +30,9 @@ function Navbar({ onLogout }: NavbarProps) {
             <NavLink to="/organizations" className={navLinkClass}>
               Organizations
             </NavLink>
+            <NavLink to="/calendar" className={navLinkClass}>
+              Calendar
+            </NavLink>
             <NavLink to="/messages" className={navLinkClass}>
               Messages
             </NavLink>
@@ -39,7 +42,7 @@ function Navbar({ onLogout }: NavbarProps) {
           </nav>
         </div>
 
-        <button type="button"
+        <button
           onClick={onLogout}
           className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 sm:px-4"
         >
@@ -57,6 +60,9 @@ function Navbar({ onLogout }: NavbarProps) {
           </NavLink>
           <NavLink to="/organizations" className={navLinkClass}>
             Organizations
+          </NavLink>
+          <NavLink to="/calendar" className={navLinkClass}>
+            Calendar
           </NavLink>
           <NavLink to="/messages" className={navLinkClass}>
             Messages
