@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import EventCard from '../components/EventCard';
 import {
@@ -10,6 +10,7 @@ import {
   createDefaultEndValue,
   createDefaultStartValue,
   createTimeOptions,
+  toDatetimeLocalInputValue,
   extractDateParts,
   getCalendarDateKey,
   getMonthGridDates,
@@ -19,6 +20,7 @@ import {
 } from '../lib/events';
 import { formatOrganizationTypeLabel } from '../lib/identity';
 import { SPORT_REGISTRATION_OPTIONS } from '../lib/sports';
+import { attachGooglePlacesAutocomplete, hasGoogleMapsPlacesKey } from '../lib/googlePlaces';
 import { supabase } from '../lib/supabase';
 
 type LinkedOrganization = {
@@ -121,6 +123,36 @@ function createInitialFormState(): EventFormState {
   };
 }
 
+
+function createFormStateFromEvent(event: EventRow): EventFormState {
+  const startParts = extractDateParts(toDatetimeLocalInputValue(new Date(event.starts_at)));
+  const endParts = event.ends_at
+    ? extractDateParts(toDatetimeLocalInputValue(new Date(event.ends_at)))
+    : { date: startParts.date, time: startParts.time };
+
+  return {
+    title: event.title,
+    eventType: event.event_type,
+    status: event.status,
+    sport: event.sport || '',
+    startDate: startParts.date,
+    startTime: startParts.time,
+    hasEnd: Boolean(event.ends_at),
+    endDate: endParts.date,
+    endTime: endParts.time,
+    location: event.location || '',
+    visibility: event.visibility,
+    relatedOrganizationId: event.related_organization_id ? String(event.related_organization_id) : '',
+    description: event.description || '',
+    opponentOrganizationId: event.opponent_organization_id ? String(event.opponent_organization_id) : '',
+    opponentQuery: event.opponent_organization?.name || '',
+    opponentName: event.opponent_organization ? '' : event.opponent_name || '',
+    competitionName: event.competition_name || '',
+    scoreFor: typeof event.score_for === 'number' ? String(event.score_for) : '',
+    scoreAgainst: typeof event.score_against === 'number' ? String(event.score_against) : '',
+  };
+}
+
 const TIME_OPTIONS = createTimeOptions(15);
 
 function CalendarPage() {
@@ -135,6 +167,11 @@ function CalendarPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<EventFormState>(() => createInitialFormState());
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [placesStatus, setPlacesStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(hasGoogleMapsPlacesKey() ? 'loading' : 'idle');
+  const formSectionRef = useRef<HTMLElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const locationInputRef = useRef<HTMLInputElement | null>(null);
   const [view, setView] = useState<CalendarView>((searchParams.get('view') as CalendarView) || 'calendar');
   const [scopeFilter, setScopeFilter] = useState(searchParams.get('scope') || 'all');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'all');
@@ -159,6 +196,44 @@ function CalendarPage() {
 
     setSearchParams(next, { replace: true });
   }, [view, scopeFilter, typeFilter, organizationFilter, setSearchParams]);
+
+  useEffect(() => {
+    if (!locationInputRef.current) return;
+    if (!hasGoogleMapsPlacesKey()) {
+      setPlacesStatus('idle');
+      return;
+    }
+
+    let cancelled = false;
+    let cleanup = () => {};
+
+    setPlacesStatus('loading');
+
+    void attachGooglePlacesAutocomplete(locationInputRef.current, (selection) => {
+      if (!selection.label) return;
+      setForm((current) => ({ ...current, location: selection.label }));
+      setPlacesStatus('ready');
+      setMessage(`Location selected: ${selection.label}`);
+    })
+      .then((detach) => {
+        if (cancelled) {
+          detach();
+          return;
+        }
+
+        cleanup = detach;
+        setPlacesStatus('ready');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPlacesStatus('error');
+      });
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, []);
 
   async function loadCalendar() {
     setLoading(true);
@@ -334,6 +409,7 @@ function CalendarPage() {
 
   const calendarDates = useMemo(() => getMonthGridDates(visibleMonth), [visibleMonth]);
   const selectedDayEvents = eventsByDate.get(selectedDateKey) || [];
+  const isEditing = editingEventId !== null;
 
   const now = Date.now();
   const upcomingEvents = filteredEvents.filter(
@@ -368,7 +444,27 @@ function CalendarPage() {
       ...current,
       opponentOrganizationId: '',
       opponentQuery: '',
+      opponentName: '',
     }));
+  }
+
+  function handleEditEvent(eventId: number) {
+    const eventToEdit = events.find((candidate) => candidate.id === eventId);
+    if (!eventToEdit) return;
+
+    setEditingEventId(eventId);
+    setForm(createFormStateFromEvent(eventToEdit));
+    setError(null);
+    setMessage(`Editing event: ${eventToEdit.title}`);
+    formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => titleInputRef.current?.focus(), 150);
+  }
+
+  function handleCancelEdit() {
+    setEditingEventId(null);
+    setForm(createInitialFormState());
+    setError(null);
+    setMessage('Event editing cancelled.');
   }
 
   async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
@@ -466,19 +562,22 @@ function CalendarPage() {
       created_by: userId,
     };
 
-    const { error: insertError } = await supabase.from('events').insert(payload);
+    const response = editingEventId
+      ? await supabase.from('events').update(payload).eq('id', editingEventId).eq('created_by', userId)
+      : await supabase.from('events').insert(payload);
 
-    if (insertError) {
+    if (response.error) {
       setSaving(false);
-      setError(insertError.message);
+      setError(response.error.message);
       return;
     }
 
     setForm(createInitialFormState());
+    setEditingEventId(null);
     setSelectedDateKey(getCalendarDateKey(startsAtIso));
     setVisibleMonth(new Date(new Date(startsAtIso).getFullYear(), new Date(startsAtIso).getMonth(), 1));
     setSaving(false);
-    setMessage('Event created. It now appears in both the calendar grid and the list view.');
+    setMessage(editingEventId ? 'Event updated.' : 'Event created. It now appears in both the calendar grid and the list view.');
     await loadCalendar();
   }
 
@@ -497,6 +596,10 @@ function CalendarPage() {
     }
 
     setDeletingId(null);
+    if (editingEventId === eventId) {
+      setEditingEventId(null);
+      setForm(createInitialFormState());
+    }
     setMessage('Event deleted.');
     await loadCalendar();
   }
@@ -507,15 +610,14 @@ function CalendarPage() {
         <div className="grid gap-8 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.9fr)] lg:px-10">
           <div className="space-y-4">
             <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">
-              Calendar UX revision v1
+              Calendar UX revision v2
             </span>
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                See your month, not just a manual event list.
+                Create, edit, and place events more naturally.
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                Asobu now supports a real calendar view, a cleaner list view, and a more sports-native creation flow for
-                matches, trainings, tournaments, tryouts, meetings, and community events.
+                Asobu now keeps the month view and list view, adds proper event editing, and makes location entry smarter when Google Places is available.
               </p>
             </div>
           </div>
@@ -523,21 +625,22 @@ function CalendarPage() {
           <div className="rounded-[28px] border border-white/10 bg-white/8 p-5 backdrop-blur">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">What changed in this pass</p>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-200">
-              <li>• Month view with dots on event days, plus the existing list view.</li>
-              <li>• Match creation now searches existing organizations first and still allows a manual fallback.</li>
-              <li>• End time is optional, and location now supports a venue name or address in a single field.</li>
+              <li>• Existing events can now be edited instead of only created or deleted.</li>
+              <li>• Location can use Google Places autocomplete when a Maps API key is configured.</li>
+              <li>• Manual location typing still works, and end time stays optional.</li>
             </ul>
           </div>
         </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
-        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
+        <section ref={formSectionRef} className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-slate-900">Create an event</h2>
+            <h2 className="text-2xl font-semibold text-slate-900">{isEditing ? 'Edit event' : 'Create an event'}</h2>
             <p className="text-sm leading-6 text-slate-600">
-              The form now adapts better to real sports activity. Matches can search opponent organizations inside Asobu,
-              while independent amateur cases still work with a manual fallback.
+              {isEditing
+                ? 'Update the event details, time, place, opponent, and result without recreating it from scratch.'
+                : 'The form adapts better to real sports activity. Matches can search opponent organizations inside Asobu, while independent amateur cases still work with a manual fallback.'}
             </p>
           </div>
 
@@ -571,6 +674,7 @@ function CalendarPage() {
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">Title</label>
               <input
+                ref={titleInputRef}
                 value={form.title}
                 onChange={(e) => setFormValue('title', e.target.value)}
                 placeholder={form.eventType === 'match' ? 'Optional. It can be generated from the selected teams.' : 'Optional but recommended.'}
@@ -695,13 +799,20 @@ function CalendarPage() {
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">Location</label>
               <input
+                ref={locationInputRef}
                 value={form.location}
                 onChange={(e) => setFormValue('location', e.target.value)}
                 placeholder="Type a venue name or address"
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
               />
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                This field is ready for venue names or addresses now. Smarter place suggestions can plug in later.
+                {placesStatus === 'ready'
+                  ? 'Google Places suggestions are active. You can still type a venue or address manually if needed.'
+                  : placesStatus === 'loading'
+                    ? 'Loading place suggestions… you can keep typing manually while they load.'
+                    : placesStatus === 'error'
+                      ? 'Place suggestions could not load, so the field stays manual for now.'
+                      : 'Type a venue or address manually. Add VITE_GOOGLE_MAPS_API_KEY later to enable Google Places suggestions.'}
               </p>
             </div>
 
@@ -872,13 +983,24 @@ function CalendarPage() {
             {error ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
             {message ? <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</p> : null}
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? 'Saving…' : 'Create event'}
-            </button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="submit"
+                disabled={saving}
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? 'Saving…' : isEditing ? 'Save changes' : 'Create event'}
+              </button>
+              {isEditing ? (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Cancel edit
+                </button>
+              ) : null}
+            </div>
           </form>
         </section>
 
@@ -1100,6 +1222,7 @@ function CalendarPage() {
                         event={eventItem}
                         currentUserId={currentUserId}
                         onDelete={deletingId ? undefined : handleDeleteEvent}
+                        onEdit={handleEditEvent}
                       />
                     ))
                   )}
@@ -1131,6 +1254,7 @@ function CalendarPage() {
                         event={eventItem}
                         currentUserId={currentUserId}
                         onDelete={deletingId ? undefined : handleDeleteEvent}
+                        onEdit={handleEditEvent}
                       />
                     ))
                   )}
@@ -1162,6 +1286,7 @@ function CalendarPage() {
                         event={eventItem}
                         currentUserId={currentUserId}
                         onDelete={deletingId ? undefined : handleDeleteEvent}
+                        onEdit={handleEditEvent}
                       />
                     ))
                   )}

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { formatOrganizationTypeLabel } from '../lib/identity';
+import { buildGoogleMapsSearchUrl } from '../lib/googlePlaces';
 import {
   formatEventDateBadge,
   formatEventDateRange,
@@ -37,9 +38,10 @@ type EventCardProps = {
   };
   currentUserId?: string | null;
   onDelete?: (eventId: number) => void;
+  onEdit?: (eventId: number) => void;
 };
 
-function EventCard({ event, currentUserId, onDelete }: EventCardProps) {
+function EventCard({ event, currentUserId, onDelete, onEdit }: EventCardProps) {
   const isOwner = !!currentUserId && currentUserId === event.created_by;
   const isMatch = event.event_type === 'match';
   const hasScore =
@@ -48,6 +50,7 @@ function EventCard({ event, currentUserId, onDelete }: EventCardProps) {
 
   const yourSideLabel = event.related_organization?.name || 'Your side';
   const opponentLabel = event.opponent_organization?.name || event.opponent_name || 'Opponent TBD';
+  const mapsUrl = event.location ? buildGoogleMapsSearchUrl(event.location) : null;
 
   return (
     <article className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -120,6 +123,16 @@ function EventCard({ event, currentUserId, onDelete }: EventCardProps) {
 
             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
               {event.location ? <span>Location: {event.location}</span> : null}
+              {mapsUrl ? (
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-slate-700 transition hover:text-slate-900"
+                >
+                  Open in Maps
+                </a>
+              ) : null}
               {event.related_organization ? (
                 <Link
                   to={`/organizations/${event.related_organization.id}`}
@@ -134,14 +147,27 @@ function EventCard({ event, currentUserId, onDelete }: EventCardProps) {
           </div>
         </div>
 
-        {isOwner && onDelete ? (
-          <button
-            type="button"
-            onClick={() => onDelete(event.id)}
-            className="shrink-0 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
-          >
-            Delete
-          </button>
+        {isOwner ? (
+          <div className="flex shrink-0 gap-2 self-start">
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={() => onEdit(event.id)}
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Edit
+              </button>
+            ) : null}
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={() => onDelete(event.id)}
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+              >
+                Delete
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </article>
