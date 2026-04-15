@@ -31,7 +31,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
   return (
     <section className="overflow-hidden rounded-[28px] bg-white shadow-sm ring-1 ring-slate-200/70">
       <div
-        className="h-20 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+        className="h-16 bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
         style={
           profile.coverImageUrl
             ? {
@@ -43,9 +43,9 @@ function ProfileCard({ profile }: ProfileCardProps) {
         }
       />
 
-      <div className="p-4">
-        <div className="-mt-10 flex items-end gap-3">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-slate-900 text-lg font-bold text-white shadow-sm">
+      <div className="p-3.5">
+        <div className="-mt-8 flex items-end gap-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-slate-900 text-base font-bold text-white shadow-sm">
             {profile.avatarUrl ? (
               <img src={profile.avatarUrl} alt={profile.name} className="h-full w-full object-cover" />
             ) : (
@@ -53,7 +53,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
             )}
           </div>
           <div className="min-w-0 pb-1">
-            <h2 className="break-words text-base font-semibold leading-tight text-slate-900">
+            <h2 className="break-words text-[15px] font-semibold leading-tight text-slate-900">
               {profile.name}
             </h2>
             <p className="mt-1 break-words text-sm text-slate-600">{profile.role}</p>
@@ -65,7 +65,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
             <p className="break-words text-slate-500">{profile.location}</p>
           ) : null}
 
-          <div className="rounded-2xl bg-slate-50 px-4 py-3">
+          <div className="rounded-2xl bg-slate-50 px-3.5 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
               Organization
             </p>
@@ -73,7 +73,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
           </div>
 
           {visibleSports.length > 0 ? (
-            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+            <div className="rounded-2xl bg-slate-50 px-3.5 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                 Sports
               </p>
@@ -81,7 +81,7 @@ function ProfileCard({ profile }: ProfileCardProps) {
                 {visibleSports.map((sport) => (
                   <span
                     key={sport}
-                    className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200"
+                    className="rounded-full bg-white px-2.5 py-1 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200"
                   >
                     {sport}
                   </span>

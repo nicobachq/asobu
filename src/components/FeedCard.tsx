@@ -158,8 +158,7 @@ function FeedCard({
         <div className="border-b border-slate-100 px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Post</h2>
-              <p className="mt-1 text-sm text-slate-500">Share an update, image, or link.</p>
+              <h2 className="text-lg font-semibold text-slate-900">Share update</h2>
             </div>
             {selectedOrganization ? (
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -169,7 +168,7 @@ function FeedCard({
           </div>
         </div>
 
-        <div className="p-5">
+        <div className="p-4">
           {manageableOrganizations.length > 0 && composerExpanded ? (
             <div className="mb-4 max-w-xs">
               <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -282,7 +281,7 @@ function FeedCard({
 
           return (
             <article id={`post-${post.id}`} key={post.id} className="overflow-hidden rounded-[28px] bg-white shadow-sm ring-1 ring-slate-200/70 scroll-mt-24">
-              <div className="p-5">
+              <div className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-start gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -313,7 +312,7 @@ function FeedCard({
                 </div>
 
                 {post.content ? (
-                  <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{post.content}</p>
+                  <p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-slate-700">{post.content}</p>
                 ) : null}
 
                 {getExternalMediaPreview(post.content) ? (
@@ -329,7 +328,7 @@ function FeedCard({
                 </div>
               ) : null}
 
-              <div className="border-t border-slate-100 px-5 py-4">
+              <div className="border-t border-slate-100 px-4 py-3.5">
                 <div className="flex items-center justify-between text-sm text-slate-500">
                   <span>{postLikes.length} likes</span>
                   <span>{postComments.length} comments</span>

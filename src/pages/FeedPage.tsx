@@ -11,15 +11,11 @@ type DbProfile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
-  avatar_url?: string | null;
-  cover_image_url?: string | null;
 };
 
 type RelatedProfile = {
   full_name: string | null;
   role: string | null;
-  avatar_url?: string | null;
-  cover_image_url?: string | null;
 };
 
 type RelatedCommentProfile = {
@@ -112,8 +108,7 @@ function FeedPage() {
     location: "Loading...",
     sports: [] as string[],
     organization: "No organization yet",
-    avatarUrl: "",
-    coverImageUrl: "",
+    openTo: ["Teams", "Clubs", "Communities"],
   });
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -133,8 +128,6 @@ function FeedPage() {
   const [commentingPostId, setCommentingPostId] = useState<number | null>(null);
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [feedMessage, setFeedMessage] = useState('');
-  const [feedError, setFeedError] = useState('');
 
   useEffect(() => {
     async function loadFeedData() {
@@ -191,8 +184,7 @@ function FeedPage() {
           location: dbProfile.location || "No location yet",
           sports: dbProfile.main_sport ? [dbProfile.main_sport] : [],
           organization: firstOrganization,
-          avatarUrl: dbProfile.avatar_url || "",
-          coverImageUrl: dbProfile.cover_image_url || "",
+          openTo: ["Teams", "Clubs", "Communities"],
         });
       }
 
@@ -295,13 +287,8 @@ function FeedPage() {
     const validationError = validatePostImageFile(file);
     if (validationError) {
       console.error(validationError);
-      setFeedError(validationError);
-      setFeedMessage('');
       return;
     }
-
-    setFeedError('');
-    setFeedMessage('');
 
     revokeObjectUrl(postImagePreviewUrl);
     const previewUrl = URL.createObjectURL(file);
@@ -316,21 +303,9 @@ function FeedPage() {
   }
 
   async function handleCreatePost() {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to publish.');
-      setFeedMessage('');
-      return;
-    }
-
-    if (!newPost.trim() && !postImageFile) {
-      setFeedError('Write something or add an image before publishing.');
-      setFeedMessage('');
-      return;
-    }
+    if (!currentUserId || (!newPost.trim() && !postImageFile)) return;
 
     setCreating(true);
-    setFeedError('');
-    setFeedMessage('');
 
     let organizationId: number | null = null;
     let uploadedImageUrl: string | null = null;
@@ -353,7 +328,6 @@ function FeedPage() {
 
       if (error) {
         console.error("Error creating post:", error.message);
-        setFeedError(`Error: ${error.message}`);
         setCreating(false);
         return;
       }
@@ -361,25 +335,20 @@ function FeedPage() {
       setNewPost("");
       handleRemovePostImage();
       await loadPosts();
-      setFeedMessage('Post published.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("Error creating post:", message);
-      setFeedError(`Error: ${message}`);
+      console.error(
+        "Error creating post:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
     } finally {
       setCreating(false);
     }
   }
 
   async function handleDeletePost(postId: number) {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to delete a post.');
-      return;
-    }
+    if (!currentUserId) return;
 
     setDeletingPostId(postId);
-    setFeedError('');
-    setFeedMessage('');
 
     const { error } = await supabase
       .from("posts")
@@ -389,24 +358,18 @@ function FeedPage() {
 
     if (error) {
       console.error("Error deleting post:", error.message);
-      setFeedError(`Error: ${error.message}`);
       setDeletingPostId(null);
       return;
     }
 
     await Promise.all([loadPosts(), loadLikes(), loadComments()]);
-    setFeedMessage('Post deleted.');
     setDeletingPostId(null);
   }
 
   async function handleToggleLike(postId: number) {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to like posts.');
-      return;
-    }
+    if (!currentUserId) return;
 
     setLikingPostId(postId);
-    setFeedError('');
 
     const existingLike = likes.find(
       (like) => like.post_id === postId && like.user_id === currentUserId
@@ -421,7 +384,6 @@ function FeedPage() {
 
       if (error) {
         console.error("Error deleting like:", error.message);
-        setFeedError(`Error: ${error.message}`);
         setLikingPostId(null);
         return;
       }
@@ -433,7 +395,6 @@ function FeedPage() {
 
       if (error) {
         console.error("Error creating like:", error.message);
-        setFeedError(`Error: ${error.message}`);
         setLikingPostId(null);
         return;
       }
@@ -444,19 +405,12 @@ function FeedPage() {
   }
 
   async function handleAddComment(postId: number) {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to comment.');
-      return;
-    }
+    if (!currentUserId) return;
 
     const content = (commentDrafts[postId] || "").trim();
-    if (!content) {
-      setFeedError('Write a comment before sending it.');
-      return;
-    }
+    if (!content) return;
 
     setCommentingPostId(postId);
-    setFeedError('');
 
     const { error } = await supabase.from("post_comments").insert({
       post_id: postId,
@@ -466,7 +420,6 @@ function FeedPage() {
 
     if (error) {
       console.error("Error creating comment:", error.message);
-      setFeedError(`Error: ${error.message}`);
       setCommentingPostId(null);
       return;
     }
@@ -477,18 +430,13 @@ function FeedPage() {
     }));
 
     await loadComments();
-    setFeedMessage('Comment added.');
     setCommentingPostId(null);
   }
 
   async function handleDeleteComment(commentId: number) {
-    if (!currentUserId) {
-      setFeedError('You need to be logged in to delete comments.');
-      return;
-    }
+    if (!currentUserId) return;
 
     setDeletingCommentId(commentId);
-    setFeedError('');
 
     const { error } = await supabase
       .from("post_comments")
@@ -498,34 +446,22 @@ function FeedPage() {
 
     if (error) {
       console.error("Error deleting comment:", error.message);
-      setFeedError(`Error: ${error.message}`);
       setDeletingCommentId(null);
       return;
     }
 
     await loadComments();
-    setFeedMessage('Comment deleted.');
     setDeletingCommentId(null);
   }
 
   return (
     <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
       <div className="mx-auto max-w-7xl space-y-5">
-        <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Home</p>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-900 sm:text-3xl">Your network activity</h1>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <span>{posts.length} posts</span>
-              <span>•</span>
-              <span>{manageableOrganizations.length} organizations</span>
-            </div>
-          </div>
+        <section className="rounded-[28px] bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200/70">
+          <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Home</h1>
         </section>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)_260px]">
           <ProfileCard profile={profile} />
           <FeedCard
             posts={posts}
@@ -554,8 +490,8 @@ function FeedPage() {
             commentingPostId={commentingPostId}
             deletingCommentId={deletingCommentId}
             currentUserId={currentUserId}
-            message={feedMessage}
-            error={feedError}
+            message=""
+            error=""
           />
           <SuggestionsCard manageableOrganizations={manageableOrganizations} />
         </div>

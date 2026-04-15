@@ -1,26 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SkillRadarChart from '../components/SkillRadarChart';
-import SkillValueBar from '../components/SkillValueBar';
 import {
   buildRoleSelectionMap,
   formatPersonRoleLabel,
   formatRoleSummary,
+  getIdentityContextLabel,
+  getOpenToLabelsForRoles,
   getUniquePersonRoles,
   ORGANIZATION_REGISTRATION_OPTIONS,
   PERSON_ROLE_OPTIONS,
-  type OrganizationRegistrationType,
   type PersonRole,
 } from '../lib/identity';
 import {
   buildDefaultSkillRatings,
-  getSkillQuerySportKeys,
-  hasCompleteSkillIdentity,
   mergeSkillEntriesWithTemplate,
   resolveSkillTemplate,
-  seedSkillEntriesFromLegacy,
   type SkillEntryValue,
-  type SkillTemplate,
   type SkillValidationSummary,
 } from '../lib/skills';
 import {
@@ -218,11 +214,6 @@ function ProfilePage() {
   );
   const [primaryRole, setPrimaryRole] = useState<PersonRole>('player');
 
-  const [orgName, setOrgName] = useState('');
-  const [orgType, setOrgType] = useState<OrganizationRegistrationType>('team');
-  const [orgSport, setOrgSport] = useState('');
-  const [orgLocation, setOrgLocation] = useState('');
-  const [orgDescription, setOrgDescription] = useState('');
 
   const [historyEntries, setHistoryEntries] = useState<SportingHistoryEntry[]>([]);
   const [historyForm, setHistoryForm] = useState<HistoryFormState>(EMPTY_HISTORY_FORM);
@@ -237,14 +228,10 @@ function ProfilePage() {
   const [skillsAvailable, setSkillsAvailable] = useState(true);
   const [savingSkills, setSavingSkills] = useState(false);
   const [skillMessage, setSkillMessage] = useState('');
-  const [skillSeedMessage, setSkillSeedMessage] = useState('');
-  const [skillSourceSportKey, setSkillSourceSportKey] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creatingOrg, setCreatingOrg] = useState(false);
   const [message, setMessage] = useState('');
-  const [orgMessage, setOrgMessage] = useState('');
 
   const selectedRoleValues = useMemo(
     () =>
@@ -283,66 +270,20 @@ function ProfilePage() {
     [allOrganizations, historyForm.selectedOrganizationId]
   );
 
-  const historyValidationHint = useMemo(() => {
-    if (!(historyForm.sport || '').trim()) {
-      return 'Choose the sport for this phase.';
-    }
-
-    if (!historyForm.positionKey) {
-      return 'Choose the position or role for this phase.';
-    }
-
-    if (selectedHistoryOrganization) {
-      return '';
-    }
-
-    if (historyForm.createOrganizationInline) {
-      if (!historyForm.inlineOrganizationName.trim()) {
-        return 'Name the organization you want to create.';
-      }
-      return '';
-    }
-
-    if (historyForm.organizationSearch.trim()) {
-      return 'Select one of the matching organizations, or create it inline below.';
-    }
-
-    return 'Search and select an organization, or create it inline below.';
-  }, [
-    historyForm.createOrganizationInline,
-    historyForm.inlineOrganizationName,
-    historyForm.organizationSearch,
-    historyForm.positionKey,
-    historyForm.sport,
-    selectedHistoryOrganization,
-  ]);
-
-  const activeSportValue = mainSport || profile?.main_sport;
+  const activeSportValue = profile?.main_sport || mainSport;
   const activeSkillTemplate = useMemo(
     () => resolveSkillTemplate(activeSportValue),
     [activeSportValue]
-  );
-
-  const skillPreviewEntries = useMemo(
-    () =>
-      activeSkillTemplate.skills.map((skill) => ({
-        skill_key: skill.key,
-        self_rating:
-          skillRatings[skill.key] ??
-          skillEntries.find((entry) => entry.skill_key === skill.key)?.self_rating ??
-          60,
-      })),
-    [activeSkillTemplate, skillEntries, skillRatings]
   );
 
   const mergedSkillCards = useMemo(
     () =>
       mergeSkillEntriesWithTemplate(
         activeSkillTemplate,
-        skillPreviewEntries,
+        skillEntries as SkillEntryValue[],
         skillValidationSummaries
       ),
-    [activeSkillTemplate, skillPreviewEntries, skillValidationSummaries]
+    [activeSkillTemplate, skillEntries, skillValidationSummaries]
   );
 
   const radarPoints = useMemo(
@@ -403,11 +344,11 @@ function ProfilePage() {
   useEffect(() => {
     async function loadSkillsForCurrentTemplate() {
       if (!profileId) return;
-      await loadProfileSkills(profileId, activeSkillTemplate);
+      await loadProfileSkills(profileId, activeSkillTemplate.key);
     }
 
     loadSkillsForCurrentTemplate();
-  }, [profileId, activeSkillTemplate]);
+  }, [profileId, activeSkillTemplate.key]);
 
   async function loadProfileRoles(userId: string, currentProfile: Profile) {
     const { data, error } = await supabase
@@ -505,25 +446,21 @@ function ProfilePage() {
     })));
   }
 
-  async function loadProfileSkills(userId: string, template: SkillTemplate) {
-    const querySportKeys = getSkillQuerySportKeys(template);
+  async function loadProfileSkills(userId: string, sportKey: string) {
     const { data, error } = await supabase
       .from('profile_skill_entries')
       .select('*')
       .eq('user_id', userId)
-      .in('sport', querySportKeys)
-      .order('updated_at', { ascending: false, nullsFirst: false })
+      .eq('sport', sportKey)
       .order('skill_key', { ascending: true });
 
     if (error) {
       console.warn('profile_skill_entries unavailable:', error.message);
       setSkillsAvailable(false);
       setSkillEntries([]);
-      setSkillSourceSportKey(null);
-      setSkillSeedMessage('');
       setSkillRatings(
         Object.fromEntries(
-          buildDefaultSkillRatings(template).map((entry) => [entry.skill_key, entry.self_rating])
+          buildDefaultSkillRatings(activeSkillTemplate).map((entry) => [entry.skill_key, entry.self_rating])
         )
       );
       setSkillValidationSummaries({});
@@ -531,81 +468,53 @@ function ProfilePage() {
     }
 
     const typedEntries = (data as ProfileSkillEntry[]) || [];
-    const actualEntries = typedEntries.filter((entry) => entry.sport === template.key);
     setSkillsAvailable(true);
-
-    if (actualEntries.length > 0) {
-      setSkillEntries(actualEntries);
-      setSkillSourceSportKey(template.key);
-      setSkillSeedMessage('');
-      setSkillRatings(
-        Object.fromEntries(
-          mergeSkillEntriesWithTemplate(template, actualEntries).map((entry) => [entry.key, entry.selfRating])
-        )
-      );
-
-      const entryMap = new Map(actualEntries.map((entry) => [entry.id, entry.skill_key]));
-
-      const { data: summaryData, error: summaryError } = await supabase.rpc(
-        'get_skill_validation_summary_for_profile',
-        {
-          p_profile_user_id: userId,
-          p_sport: template.key,
-        }
-      );
-
-      if (summaryError) {
-        console.warn('Skill validation summary unavailable:', summaryError.message);
-        setSkillValidationSummaries({});
-        return;
-      }
-
-      const summaries: Record<string, SkillValidationSummary> = {};
-
-      for (const row of (summaryData as SkillValidationSummaryRow[]) || []) {
-        const skillKey = entryMap.get(row.skill_entry_id);
-        if (!skillKey) continue;
-        summaries[skillKey] = {
-          lowerCount: row.lower_count || 0,
-          fairCount: row.fair_count || 0,
-          higherCount: row.higher_count || 0,
-          totalCount: row.total_count || 0,
-          averageVote: Number(row.average_vote || 0),
-        };
-      }
-
-      setSkillValidationSummaries(summaries);
-      return;
-    }
-
-    const legacySourceKey = template.legacySportKeys.find((key) =>
-      typedEntries.some((entry) => entry.sport === key)
+    setSkillEntries(typedEntries);
+    setSkillRatings(
+      Object.fromEntries(
+        mergeSkillEntriesWithTemplate(activeSkillTemplate, typedEntries).map((entry) => [
+          entry.key,
+          entry.selfRating,
+        ])
+      )
     );
 
-    if (legacySourceKey) {
-      const legacyEntries = typedEntries.filter((entry) => entry.sport === legacySourceKey);
-      const seededEntries = seedSkillEntriesFromLegacy(template, legacySourceKey, legacyEntries);
-      setSkillEntries([]);
-      setSkillSourceSportKey(legacySourceKey);
-      setSkillSeedMessage(
-        `Your earlier ${legacySourceKey === 'generic' ? 'generic' : legacySourceKey} ratings were used to prefill this new ${template.sportLabel.toLowerCase()} skill pack. Save once to lock the sport-specific version.`
-      );
-      setSkillRatings(
-        Object.fromEntries(seededEntries.map((entry) => [entry.skill_key, entry.self_rating]))
-      );
+    if (typedEntries.length === 0) {
       setSkillValidationSummaries({});
       return;
     }
 
-    setSkillEntries([]);
-    setSkillSourceSportKey(null);
-    setSkillSeedMessage('');
-    setSkillRatings(
-      Object.fromEntries(
-        buildDefaultSkillRatings(template).map((entry) => [entry.skill_key, entry.self_rating])
-      )
+    const entryMap = new Map(typedEntries.map((entry) => [entry.id, entry.skill_key]));
+
+    const { data: summaryData, error: summaryError } = await supabase.rpc(
+      'get_skill_validation_summary_for_profile',
+      {
+        p_profile_user_id: userId,
+        p_sport: sportKey,
+      }
     );
-    setSkillValidationSummaries({});
+
+    if (summaryError) {
+      console.warn('Skill validation summary unavailable:', summaryError.message);
+      setSkillValidationSummaries({});
+      return;
+    }
+
+    const summaries: Record<string, SkillValidationSummary> = {};
+
+    for (const row of (summaryData as SkillValidationSummaryRow[]) || []) {
+      const skillKey = entryMap.get(row.skill_entry_id);
+      if (!skillKey) continue;
+      summaries[skillKey] = {
+        lowerCount: row.lower_count || 0,
+        fairCount: row.fair_count || 0,
+        higherCount: row.higher_count || 0,
+        totalCount: row.total_count || 0,
+        averageVote: Number(row.average_vote || 0),
+      };
+    }
+
+    setSkillValidationSummaries(summaries);
   }
 
   function handleRoleToggle(role: PersonRole) {
@@ -690,55 +599,6 @@ function ProfilePage() {
     setSaving(false);
   }
 
-  async function handleCreateOrganization(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!profileId || !orgName.trim()) return;
-
-    setCreatingOrg(true);
-    setOrgMessage('');
-
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations')
-      .insert({
-        name: orgName.trim(),
-        organization_type: orgType,
-        sport: orgSport.trim() || null,
-        location: orgLocation.trim() || null,
-        description: orgDescription.trim() || null,
-        created_by: profileId,
-      })
-      .select()
-      .single();
-
-    if (orgError) {
-      setOrgMessage(`Error: ${orgError.message}`);
-      setCreatingOrg(false);
-      return;
-    }
-
-    const { error: memberError } = await supabase.from('organization_members').insert({
-      organization_id: orgData.id,
-      user_id: profileId,
-      member_role: 'owner',
-    });
-
-    if (memberError) {
-      setOrgMessage(`Error: ${memberError.message}`);
-      setCreatingOrg(false);
-      return;
-    }
-
-    setOrgName('');
-    setOrgType('team');
-    setOrgSport('');
-    setOrgLocation('');
-    setOrgDescription('');
-    setOrgMessage('Organization created successfully.');
-
-    await Promise.all([loadOrganizations(profileId), loadAllOrganizations()]);
-    setCreatingOrg(false);
-  }
 
   function populateHistoryForm(entry: SportingHistoryEntry) {
     setEditingHistoryId(entry.id);
@@ -758,55 +618,24 @@ function ProfilePage() {
     });
   }
 
-  function resetHistoryForm(options?: { preserveMessage?: boolean }) {
+  function resetHistoryForm() {
     setEditingHistoryId(null);
     setHistoryForm({
       ...EMPTY_HISTORY_FORM,
       sport: profile?.main_sport || mainSport || '',
     });
-    if (!options?.preserveMessage) {
-      setHistoryMessage('');
-    }
+    setHistoryMessage('');
   }
 
   async function handleSaveHistory(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!profileId) {
-      setHistoryMessage('Your profile is still loading. Please try again in a moment.');
-      return;
-    }
-
-    if (!(historyForm.sport || '').trim()) {
-      setHistoryMessage('Choose the sport for this sporting phase.');
-      return;
-    }
-
-    if (!historyForm.positionKey) {
-      setHistoryMessage('Choose the position or role for this sporting phase.');
-      return;
-    }
+    if (!profileId || !(historyForm.sport || '').trim() || !historyForm.positionKey) return;
 
     setSavingHistory(true);
     setHistoryMessage('');
 
-    let linkedOrganization =
-      selectedHistoryOrganization ||
-      allOrganizations.find((organization) => {
-        const query = historyForm.organizationSearch.trim().toLowerCase();
-        if (!query) return false;
-        return organization.name.trim().toLowerCase() === query;
-      }) ||
-      (filteredHistoryOrganizations.length === 1 ? filteredHistoryOrganizations[0] : null);
-
-    if (linkedOrganization && linkedOrganization.id !== historyForm.selectedOrganizationId) {
-      setHistoryForm((current) => ({
-        ...current,
-        selectedOrganizationId: linkedOrganization?.id || null,
-        organizationSearch: linkedOrganization?.name || current.organizationSearch,
-        createOrganizationInline: false,
-      }));
-    }
+    let linkedOrganization = selectedHistoryOrganization;
 
     if (!linkedOrganization && historyForm.createOrganizationInline) {
       if (!historyForm.inlineOrganizationName.trim()) {
@@ -887,7 +716,7 @@ function ProfilePage() {
     await loadSportingHistory(profileId);
     setHistoryMessage(editingHistoryId ? 'History entry updated.' : 'History entry added.');
     setSavingHistory(false);
-    resetHistoryForm({ preserveMessage: true });
+    resetHistoryForm();
   }
 
   async function handleDeleteHistory(entryId: number) {
@@ -935,7 +764,7 @@ function ProfilePage() {
       return;
     }
 
-    await loadProfileSkills(profileId, activeSkillTemplate);
+    await loadProfileSkills(profileId, activeSkillTemplate.key);
     setSkillMessage('Skill identity updated.');
     setSavingSkills(false);
   }
@@ -948,11 +777,30 @@ function ProfilePage() {
     );
   }
 
-  const hasSavedSportSpecificSkills =
-    skillSourceSportKey === activeSkillTemplate.key &&
-    hasCompleteSkillIdentity(activeSkillTemplate, skillEntries as SkillEntryValue[]);
-
-  const isSkillIdentityLocked = hasSavedSportSpecificSkills;
+  const publicReadinessChecks = [
+    Boolean((profile?.full_name || fullName).trim()),
+    Boolean((profile?.location || location).trim()),
+    Boolean((profile?.main_sport || mainSport).trim()),
+    selectedRoleValues.length > 0,
+    organizations.length > 0,
+    historyEntries.length > 0,
+    mergedSkillCards.length > 0,
+  ];
+  const publicReadinessScore = Math.round(
+    (publicReadinessChecks.filter(Boolean).length / publicReadinessChecks.length) * 100
+  );
+  const publicReadinessLabel =
+    publicReadinessScore >= 85 ? 'Strong public profile' : publicReadinessScore >= 65 ? 'Good foundation' : 'Early profile';
+  const publicNextSteps = [
+    !(profile?.full_name || fullName).trim() && 'Add your full name',
+    !(profile?.location || location).trim() && 'Add your location',
+    !(profile?.main_sport || mainSport).trim() && 'Choose your main sport',
+    selectedRoleValues.length === 0 && 'Add at least one role',
+    organizations.length === 0 && 'Join or create an organization',
+    historyEntries.length === 0 && 'Add your sporting history',
+    mergedSkillCards.length === 0 && 'Build your skill identity',
+  ].filter(Boolean) as string[];
+  const openToLabels = getOpenToLabelsForRoles(selectedRoleValues);
 
   if (!profile) {
     return (
@@ -1003,6 +851,81 @@ function ProfilePage() {
                   )}
                 </div>
               </div>
+
+              <div className="w-full max-w-[340px] rounded-[28px] bg-slate-50 p-5 xl:min-w-[320px]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Public profile readiness</p>
+                    <p className="mt-1 text-sm text-slate-500">{publicReadinessLabel}</p>
+                  </div>
+                  <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">
+                    {publicReadinessScore}%
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {publicNextSteps.length > 0 ? (
+                    publicNextSteps.map((step) => (
+                      <div key={step} className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-600">
+                        {step}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-600">
+                      Your public profile already has a strong base for discovery.
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    to={`/profiles/${profile.id}`}
+                    className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800"
+                  >
+                    View public profile
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="rounded-[28px] bg-slate-50 p-5">
+                <p className="text-sm font-semibold text-slate-900">Identity summary</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  {getIdentityContextLabel(selectedRoleValues, primaryRole)}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {openToLabels.length > 0 ? (
+                    openToLabels.map((item) => (
+                      <span key={item} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                        {item}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                      Building identity
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[28px] bg-slate-50 p-5">
+                <p className="text-sm font-semibold text-slate-900">Trusted signals</p>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Roles</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{selectedRoleValues.length}</p>
+                  </div>
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Orgs</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{organizations.length}</p>
+                  </div>
+                  <div className="rounded-[20px] bg-white p-4 text-center">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">History</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{historyEntries.length}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1013,6 +936,9 @@ function ProfilePage() {
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Profile basics</h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    Keep your profile structured and standardized so scouts, coaches, and organizations can compare people more clearly.
+                  </p>
                 </div>
               </div>
 
@@ -1111,7 +1037,7 @@ function ProfilePage() {
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Skill identity</h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {activeSkillTemplate.intro}
+                    Set your initial self-assessment, then let anonymous signals from players and coaches gradually shape the public community score.
                   </p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -1151,16 +1077,18 @@ function ProfilePage() {
                             </div>
                           </div>
 
-                          <SkillValueBar
+                          <input
+                            type="range"
+                            min={20}
+                            max={99}
                             value={skillRatings[skill.key] ?? skill.selfRating}
-                            isLocked={isSkillIdentityLocked}
-                            ariaLabel={`${skill.label} self rating`}
-                            onChange={(nextValue) =>
+                            onChange={(e) =>
                               setSkillRatings((current) => ({
                                 ...current,
-                                [skill.key]: nextValue,
+                                [skill.key]: Number(e.target.value),
                               }))
                             }
+                            className="mt-4 w-full"
                           />
 
                           <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
@@ -1175,24 +1103,16 @@ function ProfilePage() {
                     </div>
                   </div>
 
-                  {(skillSeedMessage || isSkillIdentityLocked) && (
-                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      {skillSeedMessage || 'This sport-specific skill identity is locked after the first save.'}
-                    </div>
-                  )}
-
-                  {!isSkillIdentityLocked ? (
-                    <div className="mt-5 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={handleSaveSkills}
-                        disabled={savingSkills}
-                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                      >
-                        {savingSkills ? 'Saving...' : skillSourceSportKey && skillSourceSportKey !== activeSkillTemplate.key ? 'Save sport-specific skill identity' : 'Save skill identity'}
-                      </button>
-                    </div>
-                  ) : null}
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSaveSkills}
+                      disabled={savingSkills}
+                      className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {savingSkills ? 'Saving...' : 'Save skill identity'}
+                    </button>
+                  </div>
 
                   {skillMessage && <p className="mt-4 text-sm text-slate-600">{skillMessage}</p>}
                 </>
@@ -1203,9 +1123,6 @@ function ProfilePage() {
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Structured sporting history</h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Build the timeline of your development using a real sport, a standardized position, and a shared club or team on Asobu.
-                  </p>
                 </div>
                 <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                   {historyEntries.length} entries
@@ -1480,7 +1397,7 @@ function ProfilePage() {
                       {editingHistoryId && (
                         <button
                           type="button"
-                          onClick={() => resetHistoryForm()}
+                          onClick={resetHistoryForm}
                           className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
                         >
                           Cancel edit
@@ -1488,9 +1405,6 @@ function ProfilePage() {
                       )}
                     </div>
 
-                    {historyValidationHint && !historyMessage && (
-                      <p className="lg:col-span-2 text-sm text-slate-500">{historyValidationHint}</p>
-                    )}
                     {historyMessage && <p className="lg:col-span-2 text-sm text-slate-600">{historyMessage}</p>}
                   </form>
 
@@ -1566,104 +1480,20 @@ function ProfilePage() {
           </div>
 
           <div className="space-y-6">
-            <section className="rounded-3xl bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Create organization</h2>
-              <p className="mt-2 text-sm leading-7 text-slate-500">
-                Choose the type that best fits what you are building.
-              </p>
-
-              <form onSubmit={handleCreateOrganization} className="mt-6 grid grid-cols-1 gap-4">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Organization name</label>
-                  <input
-                    type="text"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                    placeholder="FC Asobu Academy"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Organization type</label>
-                  <select
-                    value={orgType}
-                    onChange={(e) => setOrgType(e.target.value as OrganizationRegistrationType)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  >
-                    {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {ORGANIZATION_REGISTRATION_OPTIONS.find((option) => option.value === orgType)?.description || ''}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Main sport</label>
-                  <select
-                    value={orgSport}
-                    onChange={(e) => setOrgSport(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  >
-                    <option value="">Choose a sport</option>
-                    {SPORT_REGISTRATION_OPTIONS.map((sport) => (
-                      <option key={sport.value} value={sport.label}>
-                        {sport.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Location</label>
-                  <input
-                    type="text"
-                    value={orgLocation}
-                    onChange={(e) => setOrgLocation(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                    placeholder="Zurich, Switzerland"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Description</label>
-                  <textarea
-                    value={orgDescription}
-                    onChange={(e) => setOrgDescription(e.target.value)}
-                    className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-slate-300"
-                    placeholder="Short description"
-                  />
-                </div>
-
-                <div>
-                  <button
-                    type="submit"
-                    disabled={creatingOrg}
-                    className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                  >
-                    {creatingOrg ? 'Creating...' : 'Create organization'}
-                  </button>
-                </div>
-
-                {orgMessage && <p className="text-sm text-slate-600">{orgMessage}</p>}
-              </form>
-            </section>
 
             <section className="rounded-3xl bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">Your organizations</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    These organizations currently shape your visible Asobu context.
-                  </p>
                 </div>
-                <Link to="/organizations" className="text-sm font-medium text-sky-700 hover:text-sky-800">
-                  Browse all
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link to="/organizations" className="text-sm font-medium text-sky-700 hover:text-sky-800">
+                    Browse all
+                  </Link>
+                  <Link to="/organizations" className="btn-secondary px-3 py-2 text-xs">
+                    Create
+                  </Link>
+                </div>
               </div>
 
               <div className="mt-5 space-y-3">

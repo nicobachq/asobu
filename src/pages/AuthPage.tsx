@@ -246,151 +246,115 @@ function AuthPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 sm:px-6 sm:py-10">
-      <div className="mx-auto max-w-5xl">
+    <main className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-3xl">
         <div className="mb-5 flex items-center justify-between gap-3">
           <Link to="/" className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
             Asobu
           </Link>
           <Link
             to="/"
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
+            className="text-sm font-medium text-slate-600 transition hover:text-slate-900"
           >
-            Back
+            ← Back to homepage
           </Link>
         </div>
 
-        <div className="rounded-[32px] bg-white p-5 shadow-sm sm:p-6 lg:p-7">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-7">
+        <div className="mx-auto max-w-2xl rounded-[32px] bg-white p-5 shadow-sm sm:p-6 lg:p-7">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-[2rem]">
+            {isLogin ? "Log in" : "Create account"}
+          </h1>
+
+          {!isLogin ? (
+            <div className="mt-5 flex flex-wrap gap-2 rounded-[24px] bg-slate-50 p-2 ring-1 ring-slate-200/70">
+              {[
+                { key: "person", label: "Person" },
+                { key: "organization", label: "Organization" },
+              ].map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setSignUpPath(option.key as SignUpPath)}
+                  className={[
+                    'rounded-2xl px-4 py-3 text-sm font-medium transition',
+                    signUpPath === option.key
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'bg-white text-slate-700 hover:bg-slate-100',
+                  ].join(' ')}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-[2rem]">
-                {isLogin ? "Log in to Asobu" : "Create your Asobu account"}
-              </h1>
-
-              
-
-              {!isLogin && (
-                <>
-                  <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-4 sm:p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      Registration path
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {[
-                        {
-                          key: "person",
-                          label: "I am joining as a person",
-                          description: "Player, coach, or scout",
-                        },
-                        {
-                          key: "organization",
-                          label: "I am registering an organization",
-                          description: "Team, federation, club, entity, or community",
-                        },
-                      ].map((option) => (
-                        <button
-                          key={option.key}
-                          type="button"
-                          onClick={() => setSignUpPath(option.key as SignUpPath)}
-                          className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                            signUpPath === option.key
-                              ? "border-slate-900 bg-slate-900 text-white"
-                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                          }`}
-                        >
-                          <div className="font-medium">{option.label}</div>
-                          <div
-                            className={`mt-1 text-xs ${
-                              signUpPath === option.key ? "text-white/75" : "text-slate-500"
-                            }`}
-                          >
-                            {option.description}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+              <label className="mb-2 block text-sm font-medium text-slate-700">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
+                placeholder="you@example.com"
+                required
+              />
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 rounded-[28px] border border-slate-200 bg-slate-50 p-4 sm:p-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  placeholder="you@example.com"
-                  required
-                />
-              </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
+                placeholder="••••••••"
+                required
+              />
+            </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
+            {!isLogin ? (
+              <>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Full name</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
+                    placeholder="Your full name"
+                    required={!isLogin}
+                  />
+                </div>
 
-              {!isLogin && (
-                <>
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Full name
-                    </label>
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
-                      placeholder="Your full name"
-                      required={!isLogin}
-                    />
-                  </div>
-
-                  {signUpPath === "person" ? (
-                    <>
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Roles
-                        </label>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                          {PERSON_ROLE_OPTIONS.map((option) => (
-                            <label
-                              key={option.value}
-                              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedRoles[option.value]}
-                                onChange={() => handleRoleToggle(option.value)}
-                              />
-                              <span>{option.label}</span>
-                            </label>
-                          ))}
-                        </div>
+                {signUpPath === "person" ? (
+                  <>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Roles</label>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {PERSON_ROLE_OPTIONS.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedRoles[option.value]}
+                              onChange={() => handleRoleToggle(option.value)}
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                        ))}
                       </div>
+                    </div>
 
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Primary role
-                        </label>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">Primary role</label>
                         <select
                           value={primaryRole}
                           onChange={(e) => setPrimaryRole(e.target.value as PersonRole)}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
                         >
                           {selectedRoleValues.map((role) => (
                             <option key={role} value={role}>
@@ -401,13 +365,11 @@ function AuthPage() {
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Main sport
-                        </label>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">Main sport</label>
                         <select
                           value={mainSport}
                           onChange={(e) => setMainSport(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
                         >
                           <option value="">Choose a sport</option>
                           {SPORT_REGISTRATION_OPTIONS.map((sport) => (
@@ -417,45 +379,39 @@ function AuthPage() {
                           ))}
                         </select>
                       </div>
+                    </div>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Location
-                        </label>
-                        <input
-                          type="text"
-                          value={location}
-                          onChange={(e) => setLocation(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
-                          placeholder="Lugano, Switzerland"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Organization name
-                        </label>
-                        <input
-                          type="text"
-                          value={organizationName}
-                          onChange={(e) => setOrganizationName(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
-                          placeholder="FC Asobu Academy"
-                        />
-                      </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Location</label>
+                      <input
+                        type="text"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
+                        placeholder="Lugano, Switzerland"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Organization name</label>
+                      <input
+                        type="text"
+                        value={organizationName}
+                        onChange={(e) => setOrganizationName(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
+                        placeholder="FC Asobu Academy"
+                      />
+                    </div>
 
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Organization type
-                        </label>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">Organization type</label>
                         <select
                           value={organizationType}
-                          onChange={(e) =>
-                            setOrganizationType(e.target.value as OrganizationRegistrationType)
-                          }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          onChange={(e) => setOrganizationType(e.target.value as OrganizationRegistrationType)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
                         >
                           {ORGANIZATION_REGISTRATION_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -466,13 +422,11 @@ function AuthPage() {
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Main sport
-                        </label>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">Main sport</label>
                         <select
                           value={organizationSport}
                           onChange={(e) => setOrganizationSport(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
                         >
                           <option value="">Choose a sport</option>
                           {SPORT_REGISTRATION_OPTIONS.map((sport) => (
@@ -482,62 +436,65 @@ function AuthPage() {
                           ))}
                         </select>
                       </div>
+                    </div>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Location
-                        </label>
-                        <input
-                          type="text"
-                          value={organizationLocation}
-                          onChange={(e) => setOrganizationLocation(e.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
-                          placeholder="Zurich, Switzerland"
-                        />
-                      </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Location</label>
+                      <input
+                        type="text"
+                        value={organizationLocation}
+                        onChange={(e) => setOrganizationLocation(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
+                        placeholder="Zurich, Switzerland"
+                      />
+                    </div>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-700">
-                          Description
-                        </label>
-                        <textarea
-                          value={organizationDescription}
-                          onChange={(e) => setOrganizationDescription(e.target.value)}
-                          className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-300"
-                          placeholder="Short description"
-                        />
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Description</label>
+                      <textarea
+                        value={organizationDescription}
+                        onChange={(e) => setOrganizationDescription(e.target.value)}
+                        className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none focus:border-slate-300"
+                        placeholder="Short description"
+                      />
+                    </div>
+                  </>
+                )}
+              </>
+            ) : null}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
-              >
-                {loading ? "Please wait..." : isLogin ? "Log in" : "Create account"}
-              </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary min-h-[52px] w-full"
+            >
+              {loading ? "Please wait..." : isLogin ? "Log in" : "Create account"}
+            </button>
 
-              {message && <p className="text-sm text-slate-600">{message}</p>}
-
+            {isLogin ? (
               <button
                 type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setMessage("");
-                }}
-                className="text-sm font-medium text-sky-700 hover:text-sky-800"
+                onClick={() => setIsLogin(false)}
+                className="btn-secondary min-h-[52px] w-full"
               >
-                {isLogin ? "Need an account? Sign up" : "Already have an account? Log in"}
+                Need an account? Sign up
               </button>
-            </form>
-          </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsLogin(true)}
+                className="w-full text-center text-sm font-medium text-slate-600 transition hover:text-slate-900"
+              >
+                Already have an account? Log in
+              </button>
+            )}
+
+            {message ? <p className="text-sm text-slate-600">{message}</p> : null}
+          </form>
         </div>
       </div>
     </main>
-  );
+  )
 }
 
 export default AuthPage;

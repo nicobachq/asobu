@@ -638,19 +638,11 @@ function CalendarPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 py-4 sm:px-4 sm:py-6 lg:px-6">
-      <section className="app-card rounded-[32px] px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Calendar</h1>
-          </div>
-        </div>
-      </section>
+      <section className="rounded-[28px] bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200/70 sm:px-6"><h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Calendar</h1></section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
         <section ref={formSectionRef} className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-slate-900">{isEditing ? 'Edit event' : 'Create event'}</h2>
-          </div>
+          <div><h2 className="text-2xl font-semibold text-slate-900">{isEditing ? 'Edit event' : 'Create event'}</h2></div>
 
           <form className="mt-6 space-y-5" onSubmit={handleCreateEvent}>
             <div>
@@ -682,7 +674,7 @@ function CalendarPage() {
                 ref={titleInputRef}
                 value={form.title}
                 onChange={(e) => setFormValue('title', e.target.value)}
-                placeholder={form.eventType === 'match' ? 'Optional. It can be generated from the selected teams.' : 'Optional but recommended.'}
+                placeholder='Title'
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
               />
             </div>
@@ -748,23 +740,15 @@ function CalendarPage() {
             </div>
 
             <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">End time</h3>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Optional. Useful for trainings, meetings, and sessions where the finish time is already known.
-                  </p>
-                </div>
-                <label className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.hasEnd}
-                    onChange={(e) => setForm((current) => ({ ...current, hasEnd: e.target.checked }))}
-                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  />
-                  Add end time
-                </label>
-              </div>
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.hasEnd}
+                  onChange={(e) => setForm((current) => ({ ...current, hasEnd: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                />
+                Add end time
+              </label>
 
               {form.hasEnd ? (
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -801,7 +785,7 @@ function CalendarPage() {
                 ref={locationInputRef}
                 value={form.location}
                 onChange={(e) => setFormValue('location', e.target.value)}
-                placeholder="Type a venue name or address"
+                placeholder="Venue name or address"
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
               />
               <p className="mt-2 text-xs leading-5 text-slate-500">
@@ -1007,7 +991,7 @@ function CalendarPage() {
           <div className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold text-slate-900">Calendar</h2>
+                
 
               </div>
 
@@ -1209,7 +1193,7 @@ function CalendarPage() {
                     <p className="text-sm text-slate-500">Loading calendar…</p>
                   ) : selectedDayEvents.length === 0 ? (
                     <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
-                      No events match the current filters on this date yet.
+                      No events on this date.
                     </p>
                   ) : (
                     selectedDayEvents.map((eventItem) => (

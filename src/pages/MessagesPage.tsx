@@ -302,17 +302,11 @@ function MessagesPage() {
   return (
     <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
       <div className="mx-auto max-w-7xl space-y-5">
-        <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Messages</p>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-900 sm:text-3xl">Messages</h1>
-            </div>
-            <span className="text-sm text-slate-500">{conversations.length} conversations</span>
-          </div>
+        <section className="rounded-[28px] bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200/70">
+          <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Messages</h1>
         </section>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
           <section className="rounded-[32px] bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -343,9 +337,6 @@ function MessagesPage() {
             ) : conversations.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-slate-200 p-6 text-center">
                 <h3 className="text-lg font-semibold text-slate-900">No conversations yet</h3>
-                <p className="mt-2 text-sm text-slate-500">
-                  Open a public profile or Discover card and start a conversation from there.
-                </p>
                 <div className="mt-4">
                   <Link to="/discover" className="inline-flex rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
                     Go to discover
@@ -390,9 +381,6 @@ function MessagesPage() {
               <div className="flex min-h-[500px] items-center justify-center p-8 text-center">
                 <div>
                   <h2 className="text-2xl font-semibold text-slate-900">Select a conversation</h2>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Open an existing thread or start a new one from a public profile.
-                  </p>
                 </div>
               </div>
             ) : (
