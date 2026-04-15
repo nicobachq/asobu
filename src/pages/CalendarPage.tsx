@@ -304,7 +304,7 @@ function CalendarPage() {
           .limit(80)
       : Promise.resolve({ data: [], error: null });
 
-    const organizationMembershipsPromise = userId
+    const memberOrganizationIdsPromise = userId
       ? supabase
           .from('organization_members')
           .select('organization_id')
@@ -317,10 +317,10 @@ function CalendarPage() {
       .order('name', { ascending: true })
       .limit(500);
 
-    const [publicEventsResponse, privateEventsResponse, organizationMembershipsResponse, allOrganizationsResponse] = await Promise.all([
+    const [publicEventsResponse, privateEventsResponse, memberOrganizationIdsResponse, allOrganizationsResponse] = await Promise.all([
       publicEventsPromise,
       privateEventsPromise,
-      organizationMembershipsPromise,
+      memberOrganizationIdsPromise,
       allOrganizationsPromise,
     ]);
 
@@ -336,8 +336,8 @@ function CalendarPage() {
       return;
     }
 
-    if (organizationMembershipsResponse.error) {
-      setError(organizationMembershipsResponse.error.message);
+    if (memberOrganizationIdsResponse.error) {
+      setError(memberOrganizationIdsResponse.error.message);
       setLoading(false);
       return;
     }
@@ -364,13 +364,13 @@ function CalendarPage() {
       a.name.localeCompare(b.name)
     );
 
-    const membershipOrganizationIds = new Set(
-      ((((organizationMembershipsResponse.data as never[]) || []) as Array<{ organization_id: number | null }>)
+    const memberOrganizationIds = new Set(
+      ((((memberOrganizationIdsResponse.data as never[]) || []) as Array<{ organization_id: number | null }>)
         .map((row) => row.organization_id)
-        .filter((value): value is number => typeof value === 'number'))
+        .filter((id): id is number => typeof id === 'number'))
     );
 
-    const uniqueOrganizations = availableOrganizations.filter((organization) => membershipOrganizationIds.has(organization.id));
+    const uniqueOrganizations = availableOrganizations.filter((organization) => memberOrganizationIds.has(organization.id));
 
     setOrganizations(uniqueOrganizations);
     setAllOrganizations(availableOrganizations);
