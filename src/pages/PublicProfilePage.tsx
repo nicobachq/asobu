@@ -22,6 +22,8 @@ type Profile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
+  avatar_url: string | null;
+  cover_image_url: string | null;
   created_at: string | null;
 };
 
@@ -153,11 +155,6 @@ function formatHistoryPeriod(entry: SportingHistoryEntry) {
   return 'Period not specified';
 }
 
-const ROLE_DESCRIPTIONS: Record<PersonRole, string> = {
-  player: 'Build a visible athlete identity, share media, and be discovered by coaches or scouts.',
-  coach: 'Represent technical leadership, player development, and team or organization context.',
-  scout: 'Discover talent, follow profiles, and start conversations directly inside Asobu.',
-};
 
 function PublicProfilePage() {
   const { id } = useParams();
@@ -179,6 +176,7 @@ function PublicProfilePage() {
   const [validationMessage, setValidationMessage] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [validatingSkillKey, setValidatingSkillKey] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'skills' | 'history' | 'media'>('overview');
 
   const skillTemplate = useMemo(
     () => resolveSkillTemplate(profile?.main_sport || null),
@@ -221,7 +219,7 @@ function PublicProfilePage() {
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, role, location, main_sport, created_at')
+        .select('id, full_name, role, location, main_sport, avatar_url, cover_image_url, created_at')
         .eq('id', id)
         .maybeSingle();
 
@@ -446,18 +444,6 @@ function PublicProfilePage() {
   const hasSkillIdentity = skillDisplayEntries.length > 0;
   const identityContext = getIdentityContextLabel(roles, primaryRole);
   const openToLabels = getOpenToLabelsForRoles(roles);
-  const readinessChecks = [
-    Boolean(profile?.full_name?.trim()),
-    Boolean(profile?.location?.trim()),
-    sportLabels.length > 0,
-    roles.length > 0,
-    organizations.length > 0,
-    historyEntries.length > 0,
-  ];
-  const readinessScore = readinessChecks.filter(Boolean).length * Math.round(100 / readinessChecks.length);
-  const readinessLabel =
-    readinessScore >= 80 ? 'Strong' : readinessScore >= 60 ? 'Good' : 'Early';
-  const strongestOrganization = organizations[0] || null;
   const mergedSkillCards = mergeSkillEntriesWithTemplate(
     skillTemplate,
     skillDisplayEntries,
@@ -600,16 +586,34 @@ function PublicProfilePage() {
 
   const isOwnProfile = currentUserId === profile.id;
 
+  const quickStats = [
+    { label: 'Main sport', value: getPrimarySportLabelFromValue(profile.main_sport) },
+    { label: 'Primary role', value: primaryRole ? formatPersonRoleLabel(primaryRole) : '—' },
+    { label: 'Organizations', value: organizations.length > 0 ? String(organizations.length) : '—' },
+    { label: 'Joined', value: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'Recently' },
+  ];
+
   return (
     <main className="min-h-screen bg-slate-50/80">
       <div className="relative">
-        <div className="h-56 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 sm:h-64 lg:h-72" />
+        <div
+          className="h-56 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 sm:h-64 lg:h-72"
+          style={
+            profile.cover_image_url
+              ? { backgroundImage: `url(${profile.cover_image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+              : undefined
+          }
+        />
 
         <div className="mx-auto max-w-5xl px-6">
           <div className="relative -mt-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-5">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-lg sm:h-32 sm:w-32">
-                {getInitials(profile.full_name || 'Asobu User')}
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-lg sm:h-32 sm:w-32">
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt={profile.full_name || 'Asobu member'} className="h-full w-full object-cover" />
+                ) : (
+                  getInitials(profile.full_name || 'Asobu User')
+                )}
               </div>
               <div className="hidden pb-1 sm:block">
                 <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">{profile.full_name || 'Unnamed user'}</h1>
@@ -631,14 +635,8 @@ function PublicProfilePage() {
                 onClick={() => void handleShareProfile()}
                 className="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
               >
-                Share profile
+                Share
               </button>
-              <Link
-                to="/discover"
-                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                Discover
-              </Link>
             </div>
           </div>
 
@@ -674,229 +672,122 @@ function PublicProfilePage() {
       </div>
 
       <div className="mx-auto max-w-5xl px-3 pb-12 sm:px-4 sm:pb-16 lg:px-6 lg:pb-20">
-        <section className="mt-10">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Media</h2>
-            <span className="text-xs font-medium text-slate-400">
-              {mediaPosts.length} {mediaPosts.length === 1 ? 'post' : 'posts'}
-            </span>
-          </div>
-
-          {mediaPosts.length === 0 ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
-              <p className="text-sm text-slate-400">No media yet — posts with images will appear here.</p>
+        <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {quickStats.map((stat) => (
+            <div key={stat.label} className="rounded-2xl bg-white p-4 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{stat.label}</p>
+              <p className="mt-2 text-base font-semibold text-slate-900">{stat.value}</p>
             </div>
-          ) : (
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {mediaPosts.map((post, i) => (
-                <div
-                  key={post.id}
-                  className={`group relative overflow-hidden rounded-2xl bg-slate-200 ${
-                    i === 0 ? 'col-span-2 row-span-2' : ''
-                  }`}
-                >
-                  {post.image_url && (
-                    <img
-                      src={post.image_url}
-                      alt={post.content || `${profile.full_name || 'Asobu member'} media`}
-                      className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${
-                        i === 0 ? 'h-72 sm:h-96' : 'h-44 sm:h-52'
-                      }`}
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                  <div className="absolute bottom-0 left-0 right-0 translate-y-2 p-3 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
-                    <p className="line-clamp-2 text-xs font-medium text-white">{post.content || 'Image post'}</p>
-                    <p className="mt-0.5 text-[10px] text-white/70">
-                      {post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Recently'}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
         </section>
 
-        <section className="mt-12">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Primary role</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">
-                {primaryRole ? formatPersonRoleLabel(primaryRole) : '—'}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Main sport</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">
-                {getPrimarySportLabelFromValue(profile.main_sport)}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Organizations</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">{organizations.length > 0 ? organizations.length : '—'}</p>
-            </div>
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Profile</p>
-              <p className="mt-2 text-lg font-bold text-slate-900">{readinessScore}%</p>
-              <p className="text-xs text-slate-400">{readinessLabel}</p>
-            </div>
-          </div>
+        <section className="mt-8 flex flex-wrap gap-2 border-b border-slate-200 pb-4">
+          {([
+            ['overview', 'Overview'],
+            ['skills', 'Skills'],
+            ['history', 'History'],
+            ['media', 'Media'],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setActiveTab(value)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                activeTab === value ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </section>
 
-        <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_300px]">
-          <div className="space-y-10">
-            <section>
-              <h2 className="text-lg font-semibold text-slate-900">About</h2>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">{identityContext}</p>
-              {openToLabels.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {openToLabels.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold text-slate-900">Roles</h2>
-              {roles.length > 0 ? (
-                <div className="mt-4 space-y-3">
-                  {roles.map((role) => (
-                    <div key={role} className="flex items-start gap-4 rounded-2xl bg-white p-5 shadow-sm">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold uppercase text-slate-600">
-                        {role[0]}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-slate-900">{formatPersonRoleLabel(role)}</p>
-                          {role === primaryRole && (
-                            <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                              Primary
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-sm text-slate-500">{ROLE_DESCRIPTIONS[role]}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-slate-400">No roles added yet.</p>
-              )}
-            </section>
-
-            <section>
-              <h2 className="text-lg font-semibold text-slate-900">Organizations</h2>
-              {organizations.length > 0 ? (
-                <div className="mt-4 space-y-3">
-                  {organizations.map((org) => (
-                    <Link
-                      key={org.id}
-                      to={`/organizations/${org.id}`}
-                      className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-                    >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-white">
-                        {org.logo_url ? (
-                          <img src={org.logo_url} alt={org.name} className="h-full w-full object-contain p-1" />
-                        ) : (
-                          <span className="flex h-full w-full items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
-                            {getInitials(org.name)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-slate-900">{org.name}</p>
-                        <p className="mt-0.5 text-xs capitalize text-slate-400">
-                          {org.organization_type || 'Organization'} · {org.member_role}
-                          {org.location ? ` · ${org.location}` : ''}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-sky-700">
-                        {getPrimarySportLabelFromValue(org.sport)}
+        {activeTab === 'overview' && (
+          <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_280px]">
+            <div className="space-y-8">
+              <section>
+                <h2 className="text-lg font-semibold text-slate-900">About</h2>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">{identityContext}</p>
+                {openToLabels.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {openToLabels.map((item) => (
+                      <span key={item} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                        {item}
                       </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-slate-400">No organizations linked yet.</p>
-              )}
-            </section>
+                    ))}
+                  </div>
+                )}
+              </section>
 
-            <section>
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-lg font-semibold text-slate-900">Sporting history</h2>
-                <span className="text-xs font-medium text-slate-400">{historyEntries.length} phases</span>
-              </div>
-
-              {historyEntries.length > 0 ? (
-                <div className="mt-4 space-y-4">
-                  {historyEntries.map((entry) => (
-                    <div key={entry.id} className="relative rounded-2xl bg-white p-5 shadow-sm">
-                      <div className="absolute bottom-5 left-6 top-5 w-px bg-slate-200" />
-                      <div className="relative pl-8">
-                        <div className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-slate-900" />
-                        <div className="flex flex-wrap items-center gap-2">
-                          {entry.organization_id ? (
-                            <Link to={`/organizations/${entry.organization_id}`} className="font-semibold text-slate-900 hover:text-sky-700">
-                              {entry.organization_name}
-                            </Link>
+              <section>
+                <h2 className="text-lg font-semibold text-slate-900">Organizations</h2>
+                {organizations.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {organizations.map((org) => (
+                      <Link
+                        key={org.id}
+                        to={`/organizations/${org.id}`}
+                        className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                      >
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-white">
+                          {org.logo_url ? (
+                            <img src={org.logo_url} alt={org.name} className="h-full w-full object-contain p-1" />
                           ) : (
-                            <p className="font-semibold text-slate-900">{entry.organization_name}</p>
-                          )}
-                          {entry.is_current && (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                              Current
+                            <span className="flex h-full w-full items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
+                              {getInitials(org.name)}
                             </span>
                           )}
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
-                            {getPrimarySportLabelFromValue(entry.sport)}
-                          </span>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                            {getPositionLabel(entry.sport, entry.position_key)}
-                          </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-900">{org.name}</p>
+                          <p className="mt-0.5 text-xs capitalize text-slate-400 break-words">
+                            {org.organization_type || 'Organization'} · {org.member_role}
+                            {org.location ? ` · ${org.location}` : ''}
+                          </p>
                         </div>
-                        <p className="mt-2 text-sm text-slate-500">
-                          {(entry.organization_type || 'organization') + ' · ' + (entry.location || 'No location')}
-                        </p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">{formatHistoryPeriod(entry)}</p>
-                        {entry.summary && <p className="mt-3 text-sm leading-7 text-slate-600">{entry.summary}</p>}
-                      </div>
+                        <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-sky-700">
+                          {getPrimarySportLabelFromValue(org.sport)}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-400">
+                    No organizations yet.
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <aside className="space-y-4">
+              <section className="rounded-2xl bg-white p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-slate-900">Quick stats</h3>
+                <div className="mt-4 space-y-3 text-sm text-slate-600">
+                  {quickStats.map((stat) => (
+                    <div key={stat.label} className="flex items-center justify-between gap-4">
+                      <span className="text-slate-400">{stat.label}</span>
+                      <span className="font-medium text-slate-900 text-right">{stat.value}</span>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
-                  <p className="text-sm text-slate-400">No sporting history added yet.</p>
-                </div>
-              )}
-            </section>
+              </section>
+            </aside>
           </div>
+        )}
 
-          <div className="space-y-6">
+        {activeTab === 'skills' && (
+          <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
             <div className="rounded-2xl bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Skill identity</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">{skillTemplate.validationLabel}</p>
-                </div>
+                <h2 className="text-lg font-semibold text-slate-900">Skills</h2>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-700">
                   {skillTemplate.sportLabel}
                 </span>
               </div>
-
               {usingLegacySkillSeed ? (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
-                  This profile still uses an older skill pack. The owner needs to resave this sport to activate voting.
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                  The owner needs to resave this sport to activate voting.
                 </div>
               ) : null}
-
               {hasSkillIdentity ? (
                 <div className="mt-4 rounded-xl bg-slate-50 p-4">
                   <SkillRadarChart points={radarPoints} title={skillTemplate.label} />
@@ -906,86 +797,128 @@ function PublicProfilePage() {
                   <p className="text-xs text-slate-400">No skill identity published yet.</p>
                 </div>
               )}
-
-              {hasSkillIdentity ? (
-                <div className="mt-4 space-y-3">
-                  {mergedSkillCards.map((skill) => {
-                    const myVote = mySkillVotes[skill.key] ?? null;
-                    return (
-                      <div key={skill.key} className="rounded-xl border border-slate-200 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-slate-900">{skill.label}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              Self {skill.selfRating} · Community {skill.communityScore} · {skill.validationSummary.totalCount} anonymous votes
-                            </p>
-                            <p className="mt-1 text-[11px] text-slate-400">
-                              {skill.validationSummary.higherCount} higher · {skill.validationSummary.fairCount} fair · {skill.validationSummary.lowerCount} lower
-                            </p>
-                          </div>
-                        </div>
-
-                        {!isOwnProfile && !usingLegacySkillSeed && (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {([
-                              { label: 'Lower', value: -1 as const },
-                              { label: 'Fair', value: 0 as const },
-                              { label: 'Higher', value: 1 as const },
-                            ]).map((option) => (
-                              <button
-                                key={option.label}
-                                type="button"
-                                onClick={() => handleSetSkillVote(skill.key, option.value)}
-                                disabled={validatingSkillKey === skill.key || !canCurrentUserVote}
-                                className={`rounded-full px-3 py-1 text-xs font-semibold transition disabled:opacity-50 ${
-                                  myVote === option.value
-                                    ? 'bg-slate-900 text-white hover:bg-slate-800'
-                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                }`}
-                              >
-                                {validatingSkillKey === skill.key && myVote === option.value ? '...' : option.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              {!isOwnProfile && hasSkillIdentity && !usingLegacySkillSeed && (
-                <p className="mt-4 text-xs leading-relaxed text-slate-500">
-                  Anonymous skill votes are limited to logged-in players and coaches.
-                </p>
-              )}
               {validationMessage && <p className="mt-4 text-sm text-slate-600">{validationMessage}</p>}
             </div>
-            {strongestOrganization && (
-              <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-slate-900">Primary affiliation</h3>
-                <p className="mt-2 text-sm text-slate-500">
-                  Most visible through <span className="font-medium text-slate-700">{strongestOrganization.name}</span>
-                </p>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {mergedSkillCards.map((skill) => {
+                const myVote = mySkillVotes[skill.key] ?? null;
+                return (
+                  <div key={skill.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="font-medium text-slate-900">{skill.label}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Self {skill.selfRating} · Community {skill.communityScore} · {skill.validationSummary.totalCount} votes
+                    </p>
+                    {!isOwnProfile && !usingLegacySkillSeed && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {([
+                          { label: 'Lower', value: -1 as const },
+                          { label: 'Fair', value: 0 as const },
+                          { label: 'Higher', value: 1 as const },
+                        ]).map((option) => (
+                          <button
+                            key={option.label}
+                            type="button"
+                            onClick={() => handleSetSkillVote(skill.key, option.value)}
+                            disabled={validatingSkillKey === skill.key || !canCurrentUserVote}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                              myVote === option.value
+                                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            {validatingSkillKey === skill.key && myVote === option.value ? '...' : option.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'history' && (
+          <section className="mt-8">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-lg font-semibold text-slate-900">Sporting history</h2>
+              <span className="text-xs font-medium text-slate-400">{historyEntries.length} phases</span>
+            </div>
+
+            {historyEntries.length > 0 ? (
+              <div className="mt-4 space-y-4">
+                {historyEntries.map((entry) => (
+                  <div key={entry.id} className="relative rounded-2xl bg-white p-5 shadow-sm">
+                    <div className="absolute bottom-5 left-6 top-5 w-px bg-slate-200" />
+                    <div className="relative pl-8">
+                      <div className="absolute left-0 top-1.5 h-3 w-3 rounded-full bg-slate-900" />
+                      <div className="flex flex-wrap items-center gap-2">
+                        {entry.organization_id ? (
+                          <Link to={`/organizations/${entry.organization_id}`} className="font-semibold text-slate-900 hover:text-sky-700">
+                            {entry.organization_name}
+                          </Link>
+                        ) : (
+                          <p className="font-semibold text-slate-900">{entry.organization_name}</p>
+                        )}
+                        {entry.is_current && (
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                          {getPrimarySportLabelFromValue(entry.sport)}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                          {getPositionLabel(entry.sport, entry.position_key)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-500">
+                        {(entry.organization_type || 'organization') + ' · ' + (entry.location || 'No location')}
+                      </p>
+                      <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-400">{formatHistoryPeriod(entry)}</p>
+                      {entry.summary && <p className="mt-3 text-sm leading-7 text-slate-600">{entry.summary}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
+                <p className="text-sm text-slate-400">No sporting history yet.</p>
               </div>
             )}
+          </section>
+        )}
 
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-900">Connect</h3>
-              {!isOwnProfile && (
-                <Link
-                  to={`/messages?with=${profile.id}`}
-                  className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-                >
-                  Message this member
-                </Link>
-              )}
+        {activeTab === 'media' && (
+          <section className="mt-8">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">Media</h2>
+              <span className="text-xs font-medium text-slate-400">{mediaPosts.length} {mediaPosts.length === 1 ? 'post' : 'posts'}</span>
             </div>
-          </div>
-        </div>
+            {mediaPosts.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+                <p className="text-sm text-slate-400">No media yet.</p>
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {mediaPosts.map((post, i) => (
+                  <div key={post.id} className={`group relative overflow-hidden rounded-2xl bg-slate-200 ${i === 0 ? 'col-span-2 row-span-2' : ''}`}>
+                    {post.image_url && (
+                      <img src={post.image_url} alt={post.content || `${profile.full_name || 'Asobu member'} media`} className={`w-full object-cover ${i === 0 ? 'h-72 sm:h-96' : 'h-44 sm:h-52'}`} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </main>
   );
+
 }
 
 export default PublicProfilePage;

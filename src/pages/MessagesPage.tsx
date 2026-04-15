@@ -306,18 +306,14 @@ function MessagesPage() {
           <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Messages</h1>
         </section>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
           <section className="rounded-[32px] bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">Inbox</h2>
                 
               </div>
-              {conversations.length > 0 && (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                  {conversations.length}
-                </span>
-              )}
+
             </div>
 
             {pageError && (
@@ -351,7 +347,7 @@ function MessagesPage() {
                     <Link
                       key={conversation.id}
                       to={`/messages/${conversation.id}`}
-                      className={`block rounded-[24px] p-4 transition ${
+                      className={`block rounded-[20px] p-3 transition ${
                         isActive ? "bg-slate-900 text-white shadow-sm" : "bg-slate-50 hover:bg-slate-100"
                       }`}
                     >
@@ -389,7 +385,7 @@ function MessagesPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h2 className="text-xl font-semibold text-slate-900">{activeConversation.title}</h2>
-                      <p className="mt-1 text-sm text-slate-500">{activeConversation.subtitle}</p>
+
                     </div>
 
                     {activeConversation.otherUserId && (
@@ -406,7 +402,7 @@ function MessagesPage() {
                 <div className="min-h-[380px] space-y-4 px-6 py-6">
                   {activeMessages.length === 0 ? (
                     <div className="rounded-[24px] border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-                      No messages yet. Start the conversation below.
+No messages yet.
                     </div>
                   ) : (
                     activeMessages.map((message) => {

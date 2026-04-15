@@ -6,7 +6,7 @@ import ProfileCard from "../components/ProfileCard";
 import ExternalMediaCard from "../components/ExternalMediaCard";
 import {
   formatOrganizationTypeLabel,
-  getOrganizationTypeDescription,
+  getOrganizationTypeAudienceLabel,
   normalizeOrganizationType,
   ORGANIZATION_REGISTRATION_OPTIONS,
 } from "../lib/identity";
@@ -1067,12 +1067,6 @@ function OrganizationPage() {
     setOrgPostImagePreviewUrl("");
   }
 
-  function focusCommentInput(postId: number) {
-    const input = document.getElementById(`organization-comment-input-${postId}`) as HTMLInputElement | null;
-    input?.focus();
-    input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
   async function handleShareOrganization() {
     if (!organization) return;
 
@@ -1363,7 +1357,7 @@ function OrganizationPage() {
                     pending request
                   </span>
                 ) : (
-                  <button type="button"
+                  <button
                     onClick={handleJoinRequest}
                     disabled={joiningOrganization}
                     className={heroGhostButton + " disabled:opacity-60"}
@@ -1373,7 +1367,7 @@ function OrganizationPage() {
                 )}
 
                 {canEditOrganization && !editMode && (
-                  <button type="button"
+                  <button
                     onClick={() => {
                       setEditMode(true);
                       setPageError("");
@@ -1386,7 +1380,7 @@ function OrganizationPage() {
                 )}
 
                 {canSelfLeave && (
-                  <button type="button"
+                  <button
                     onClick={handleLeaveOrganization}
                     disabled={leavingOrganization}
                     className={heroGhostDangerButton + " disabled:opacity-60"}
@@ -1493,7 +1487,7 @@ function OrganizationPage() {
               </div>
 
               <p className="mt-4 text-sm leading-7 text-slate-500">
-                
+                On Asobu, organization is the umbrella for {getOrganizationTypeAudienceLabel().toLowerCase()}. This page is a {formatOrganizationTypeLabel(organization.organization_type).toLowerCase()} profile.
               </p>
             </div>
 
@@ -1544,12 +1538,8 @@ function OrganizationPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-slate-900">
-                  Organization settings
+                  Edit details
                 </h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  Update the main details and upload logo and cover directly from your
-                  computer.
-                </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                 {editMode ? "editing" : "ready"}
@@ -1585,10 +1575,7 @@ function OrganizationPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {getOrganizationTypeDescription(orgType)}
-                  </p>
-                </div>
+                                  </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -1718,13 +1705,13 @@ function OrganizationPage() {
                 </div>
 
                 <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
-                  <button type="button"
+                  <button
                     onClick={handleCancelOrganizationEdit}
                     className={solidSecondaryButton}
                   >
                     Cancel
                   </button>
-                  <button type="button"
+                  <button
                     onClick={handleSaveOrganization}
                     disabled={savingOrganization || !orgName.trim()}
                     className={solidPrimaryButton}
@@ -1775,11 +1762,7 @@ function OrganizationPage() {
                 <h2 className="text-2xl font-semibold text-slate-900">
                   Ownership transfer
                 </h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  Transfer this organization to an existing member or admin. After
-                  transfer, you become an admin and can leave the organization if needed.
-                </p>
-              </div>
+                              </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                 owner only
               </span>
@@ -1810,7 +1793,7 @@ function OrganizationPage() {
                   </select>
                 </div>
 
-                <button type="button"
+                <button
                   onClick={handleTransferOwnership}
                   disabled={transferringOwnership || !transferTargetUserId}
                   className={solidPrimaryButton}
@@ -1864,14 +1847,14 @@ function OrganizationPage() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <button type="button"
+                        <button
                           onClick={() => handleApproveRequest(request)}
                           disabled={processingRequestId === request.id}
                           className={smallPrimaryButton}
                         >
                           {processingRequestId === request.id ? "Working..." : "Approve"}
                         </button>
-                        <button type="button"
+                        <button
                           onClick={() => handleDeclineRequest(request.id)}
                           disabled={processingRequestId === request.id}
                           className={smallSecondaryButton}
@@ -1891,10 +1874,7 @@ function OrganizationPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-2xl font-semibold text-slate-900">Members</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                People currently inside this organization.
-              </p>
-            </div>
+                          </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
               {memberCount}
             </span>
@@ -1947,7 +1927,7 @@ function OrganizationPage() {
                     {(canPromote || canDemote || canRemove) && (
                       <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
                         {canPromote && (
-                          <button type="button"
+                          <button
                             onClick={() => handleChangeMemberRole(member.id, "admin")}
                             disabled={processingMemberId === member.id}
                             className={smallPrimaryButton}
@@ -1959,7 +1939,7 @@ function OrganizationPage() {
                         )}
 
                         {canDemote && (
-                          <button type="button"
+                          <button
                             onClick={() => handleChangeMemberRole(member.id, "member")}
                             disabled={processingMemberId === member.id}
                             className={smallSecondaryButton}
@@ -1971,7 +1951,7 @@ function OrganizationPage() {
                         )}
 
                         {canRemove && (
-                          <button type="button"
+                          <button
                             onClick={() => handleRemoveMember(member.id)}
                             disabled={processingMemberId === member.id}
                             className={smallDangerButton}
@@ -1996,10 +1976,7 @@ function OrganizationPage() {
               <h2 className="text-2xl font-semibold text-slate-900">
                 Organization posts
               </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                Only owners and admins can publish as this organization.
-              </p>
-            </div>
+                          </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
               {posts.length} posts
             </span>
@@ -2088,7 +2065,7 @@ function OrganizationPage() {
               </div>
 
               <div className="mt-4 flex justify-end">
-                <button type="button"
+                <button
                   onClick={handleCreateOrganizationPost}
                   disabled={creatingPost || (!newPost.trim() && !orgPostImagePreviewUrl)}
                   className={solidPrimaryButton}
@@ -2157,7 +2134,7 @@ function OrganizationPage() {
                           Organization post
                         </span>
                         {isOwner && (
-                          <button type="button"
+                          <button
                             onClick={() => handleDeletePost(post.id)}
                             disabled={deletingPostId === post.id}
                             className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
@@ -2196,7 +2173,7 @@ function OrganizationPage() {
                     </div>
 
                     <div className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-100 pt-4">
-                      <button type="button"
+                      <button
                         onClick={() => handleToggleLike(post.id)}
                         disabled={likingPostId === post.id}
                         className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
@@ -2207,14 +2184,10 @@ function OrganizationPage() {
                           ? "Unlike"
                           : "Like"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => focusCommentInput(post.id)}
-                        className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-                      >
+                      <button className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
                         Comment
                       </button>
-                      <button type="button"
+                      <button
                         onClick={() => void handleSharePost(post)}
                         className="rounded-xl px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
                       >
@@ -2242,7 +2215,7 @@ function OrganizationPage() {
                               </div>
 
                               {canDeleteComment && (
-                                <button type="button"
+                                <button
                                   onClick={() => handleDeleteComment(comment.id)}
                                   disabled={deletingCommentId === comment.id}
                                   className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
@@ -2270,7 +2243,7 @@ function OrganizationPage() {
                           placeholder="Write a comment..."
                           className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
                         />
-                        <button type="button"
+                        <button
                           onClick={() => handleAddComment(post.id)}
                           disabled={
                             commentingPostId === post.id ||
@@ -2292,7 +2265,7 @@ function OrganizationPage() {
 
       <div className="space-y-6">
         <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Quick overview</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Overview</h2>
           <p className="mt-3 text-sm text-slate-600">{sidebarStatusLabel}</p>
 
           <div className="mt-5 grid grid-cols-2 gap-3">
@@ -2327,60 +2300,6 @@ function OrganizationPage() {
               <span className="font-semibold">Location:</span>{" "}
               {organization.location || "Not specified"}
             </p>
-          </div>
-        </section>
-
-        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Branding</h2>
-          <div className="mt-5 space-y-4">
-            <div>
-              <p className="text-sm text-slate-500">Logo</p>
-              <div className="mt-2 flex h-28 w-28 items-center justify-center rounded-[24px] border border-slate-200 bg-white">
-                {organization.logo_url ? (
-                  <img
-                    src={organization.logo_url}
-                    alt={organization.name}
-                    className="h-full w-full rounded-[20px] object-contain p-2"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-slate-900 text-lg font-semibold text-white">
-                    {getInitials(organization.name)}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm text-slate-500">Cover</p>
-              <div
-                className="mt-2 h-28 rounded-[24px] bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
-                style={
-                  organization.cover_image_url
-                    ? {
-                        backgroundImage: `url(${organization.cover_image_url})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }
-                    : undefined
-                }
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Management</h2>
-
-          <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-            {canManageMembers
-              ? "You can edit organization details, upload branding, transfer ownership, review join requests, promote or remove members, and publish organization posts on this page."
-              : canManageOrganization
-              ? "You can edit organization details, upload branding, review join requests, publish organization posts, and leave the organization yourself. Member role changes and ownership transfer stay limited to the owner."
-              : canSelfLeave
-              ? "You are a member of this organization and can leave it at any time from the top action buttons."
-              : myMembershipRole === "owner"
-              ? "You are the owner of this organization. Transfer ownership first if you want to leave later."
-              : "You can read the organization page and interact with posts, but management actions stay limited to admins and owners."}
           </div>
         </section>
       </div>
