@@ -119,6 +119,7 @@ function FeedCard({
   error,
 }: FeedCardProps) {
   const [shareFeedback, setShareFeedback] = useState("");
+  const [composerExpanded, setComposerExpanded] = useState(false);
 
   const selectedOrganization = selectedPublisher.startsWith("org-")
     ? manageableOrganizations.find(
@@ -132,7 +133,7 @@ function FeedCard({
   function focusCommentInput(postId: number) {
     const input = document.getElementById(`feed-comment-input-${postId}`) as HTMLInputElement | null;
     input?.focus();
-    input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    input?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   async function handleSharePost(post: Post) {
@@ -143,168 +144,127 @@ function FeedCard({
 
     const result = await shareOrCopy({
       title: `${organization?.name || post.profiles?.full_name || "Asobu member"} on Asobu`,
-      text: post.content?.trim()
-        ? `${post.content.trim()}\n\nShared from Asobu`
-        : "Shared from Asobu",
+      text: post.content?.trim() ? `${post.content.trim()}\n\nShared from Asobu` : "Shared from Asobu",
       url: shareUrl,
     });
 
-    if (result === "copied") {
-      setShareFeedback("Post link copied.");
-    } else if (result === "shared") {
-      setShareFeedback("Post shared.");
-    }
+    if (result === "copied") setShareFeedback("Post link copied.");
+    if (result === "shared") setShareFeedback("Post shared.");
   }
 
   return (
-    <div className="space-y-6">
-      <section className="app-card overflow-hidden rounded-[32px]">
-        <div className="app-gradient-panel px-6 py-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-[28px] bg-white shadow-sm ring-1 ring-slate-200/70">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Publish
-              </p>
-              <h2 className="mt-2 text-2xl font-bold text-slate-900">Share what strengthens your sports identity</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-                Publish as yourself or as one of your organizations. Text, photos, and external media links all become part of your public sporting story.
-              </p>
+              <h2 className="text-lg font-semibold text-slate-900">Post</h2>
+              <p className="mt-1 text-sm text-slate-500">Share an update, image, or link.</p>
             </div>
-            <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
-              {selectedOrganization ? `Publishing as ${selectedOrganization.name}` : `Publishing as ${currentProfileName}`}
-            </div>
+            {selectedOrganization ? (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                Posting as {selectedOrganization.name}
+              </span>
+            ) : null}
           </div>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Publish as
+        <div className="p-5">
+          {manageableOrganizations.length > 0 && composerExpanded ? (
+            <div className="mb-4 max-w-xs">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Post as
               </label>
               <select
                 value={selectedPublisher}
                 onChange={(e) => setSelectedPublisher(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-[var(--asobu-primary)] focus:bg-white"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
               >
                 <option value="me">Me · {currentProfileName}</option>
                 {manageableOrganizations.map((organization) => (
                   <option key={organization.id} value={`org-${organization.id}`}>
-                    Organization · {organization.name}
+                    {organization.name}
                   </option>
                 ))}
               </select>
             </div>
+          ) : null}
 
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Story / update
-              </label>
-              <textarea
-                value={newPost}
-                onChange={(e) => setNewPost(e.target.value)}
-                placeholder="Share a result, achievement, photo, YouTube link, social post, transfer update, or community news..."
-                className="min-h-[140px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--asobu-primary)] focus:bg-white"
-              />
-            </div>
-          </div>
+          <textarea
+            value={newPost}
+            onFocus={() => setComposerExpanded(true)}
+            onChange={(e) => setNewPost(e.target.value)}
+            placeholder="Share an update"
+            className={`w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 ${
+              composerExpanded ? "min-h-[140px]" : "min-h-[96px]"
+            }`}
+          />
 
-          {selectedOrganization && (
-            <div className="mt-5 flex items-center gap-4 rounded-[24px] bg-slate-50 p-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white">
-                {selectedOrganization.logo_url ? (
-                  <img
-                    src={selectedOrganization.logo_url}
-                    alt={selectedOrganization.name}
-                    className="h-full w-full rounded-2xl object-contain p-1.5"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-sm font-semibold text-[var(--asobu-primary-dark)]">
-                    {getInitials(selectedOrganization.name)}
-                  </div>
-                )}
+          {(composerExpanded || postImagePreviewUrl || composerExternalMedia) && (
+            <>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]">
+                  Add image
+                  <input type="file" accept="image/*" className="hidden" onChange={onPostImageChange} />
+                </label>
+
+                {postImagePreviewUrl ? (
+                  <button
+                    type="button"
+                    onClick={onRemovePostImage}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
+                  >
+                    Remove image
+                  </button>
+                ) : null}
+
+                <div className="ml-auto flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComposerExpanded(false);
+                      setNewPost("");
+                      onRemovePostImage();
+                    }}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCreatePost}
+                    disabled={creating || !canPublish}
+                    className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {creating ? "Posting..." : "Post"}
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Posting as {selectedOrganization.name}</p>
-                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                  {selectedOrganization.organization_type || "organization"}
-                </p>
-              </div>
-            </div>
+              {postImageFileName ? <p className="mt-3 text-xs text-slate-500">{postImageFileName}</p> : null}
+
+              {composerExternalMedia ? (
+                <div className="mt-4">
+                  <ExternalMediaCard content={newPost} previewLabel="Link preview" />
+                </div>
+              ) : null}
+
+              {postImagePreviewUrl ? (
+                <div className="mt-4 overflow-hidden rounded-2xl bg-slate-100">
+                  <img src={postImagePreviewUrl} alt="Post preview" className="max-h-[520px] w-full object-cover" />
+                </div>
+              ) : null}
+            </>
           )}
 
-          <div className="app-card-subtle mt-5 rounded-[24px] p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="app-button-secondary inline-flex cursor-pointer items-center rounded-full px-4 py-2 text-sm font-medium">
-                Add image
-                <input type="file" accept="image/*" className="hidden" onChange={onPostImageChange} />
-              </label>
-
-              {postImagePreviewUrl && (
-                <button
-                  type="button"
-                  onClick={onRemovePostImage}
-                  className="app-button-secondary rounded-full px-4 py-2 text-sm font-medium"
-                >
-                  Remove image
-                </button>
-              )}
-
-              <span className="app-chip ml-auto rounded-full px-3 py-1 text-xs font-medium">
-                {composerExternalMedia ? "Media link detected" : "Media ready"}
-              </span>
-            </div>
-
-            {postImageFileName && (
-              <p className="mt-3 text-xs text-slate-500">Selected image: {postImageFileName}</p>
-            )}
-
-            {composerExternalMedia && (
-              <div className="mt-4">
-                <ExternalMediaCard content={newPost} previewLabel="Detected link preview" />
-              </div>
-            )}
-
-            {postImagePreviewUrl && (
-              <div className="mt-4 overflow-hidden rounded-[24px] border border-slate-200 bg-white">
-                <img
-                  src={postImagePreviewUrl}
-                  alt="Post preview"
-                  className="max-h-[520px] w-full object-cover"
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <div className="flex flex-wrap gap-2">
-              <span className="app-chip-brand rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
-                Identity post
-              </span>
-              <span className="app-chip rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
-                Images + links
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={onCreatePost}
-              disabled={creating || !canPublish}
-              className="app-button-primary rounded-full px-6 py-3 text-sm font-semibold disabled:opacity-50"
-            >
-              {creating ? "Posting..." : "Publish on Asobu"}
-            </button>
-          </div>
-
-          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-          {!error && message && <p className="mt-4 text-sm text-emerald-600">{message}</p>}
-          {shareFeedback && <p className="mt-4 text-sm text-emerald-600">{shareFeedback}</p>}
+          {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
+          {!error && message ? <p className="mt-4 text-sm text-emerald-600">{message}</p> : null}
+          {shareFeedback ? <p className="mt-4 text-sm text-emerald-600">{shareFeedback}</p> : null}
         </div>
       </section>
 
       {posts.length === 0 ? (
-        <div className="rounded-[32px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
+        <div className="rounded-[28px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500 shadow-sm">
           No posts yet.
         </div>
       ) : (
@@ -317,121 +277,111 @@ function FeedCard({
           const postComments = comments.filter((comment) => comment.post_id === post.id);
           const displayName = organization?.name || author?.full_name || "Athlete";
           const metaLine = organization
-            ? `${organization.organization_type || "organization"} · posted by ${author?.full_name || "member"}`
-            : author?.role || "member";
+            ? `${author?.full_name || "Member"} · ${post.created_at ? new Date(post.created_at).toLocaleString() : "Just now"}`
+            : `${author?.role || "Member"} · ${post.created_at ? new Date(post.created_at).toLocaleString() : "Just now"}`;
 
           return (
-            <article id={`post-${post.id}`} key={post.id} className="app-card overflow-hidden rounded-[32px] scroll-mt-24">
-              <div className="p-6">
+            <article id={`post-${post.id}`} key={post.id} className="overflow-hidden rounded-[28px] bg-white shadow-sm ring-1 ring-slate-200/70 scroll-mt-24">
+              <div className="p-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex min-w-0 items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white">
                       {organization?.logo_url ? (
-                        <img
-                          src={organization.logo_url}
-                          alt={organization.name}
-                          className="h-full w-full rounded-2xl object-contain p-1.5"
-                        />
+                        <img src={organization.logo_url} alt={organization.name} className="h-full w-full object-contain p-1.5" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-sm font-semibold text-[var(--asobu-primary-dark)]">
+                        <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
                           {getInitials(displayName)}
                         </div>
                       )}
                     </div>
-
                     <div className="min-w-0">
-                      <h3 className="truncate text-xl font-bold text-slate-900">{displayName}</h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {metaLine} · {post.created_at ? new Date(post.created_at).toLocaleString() : "Just now"}
-                      </p>
+                      <h3 className="break-words text-base font-semibold text-slate-900">{displayName}</h3>
+                      <p className="mt-1 break-words text-sm text-slate-500">{metaLine}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {organization && (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                        Organization post
-                      </span>
-                    )}
-                    {isOwner && (
-                      <button type="button"
-                        onClick={() => onDeletePost(post.id)}
-                        disabled={deletingPostId === post.id}
-                        className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                      >
-                        {deletingPostId === post.id ? "Deleting..." : "Delete"}
-                      </button>
-                    )}
-                  </div>
+                  {isOwner ? (
+                    <button
+                      type="button"
+                      onClick={() => onDeletePost(post.id)}
+                      disabled={deletingPostId === post.id}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 active:scale-[0.99] disabled:opacity-50"
+                    >
+                      {deletingPostId === post.id ? "Deleting..." : "Delete"}
+                    </button>
+                  ) : null}
                 </div>
 
-                {post.content && (
-                  <p className="mt-5 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{post.content}</p>
-                )}
+                {post.content ? (
+                  <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{post.content}</p>
+                ) : null}
 
-                {getExternalMediaPreview(post.content) && (
-                  <div className="mt-5">
+                {getExternalMediaPreview(post.content) ? (
+                  <div className="mt-4">
                     <ExternalMediaCard content={post.content} />
                   </div>
-                )}
+                ) : null}
               </div>
 
-              {post.image_url && (
+              {post.image_url ? (
                 <div className="overflow-hidden bg-slate-100">
                   <img src={post.image_url} alt={post.content || `${displayName} post`} className="max-h-[620px] w-full object-cover" />
                 </div>
-              )}
+              ) : null}
 
-              <div className="border-t border-slate-200 px-6 py-5">
+              <div className="border-t border-slate-100 px-5 py-4">
                 <div className="flex items-center justify-between text-sm text-slate-500">
                   <span>{postLikes.length} likes</span>
                   <span>{postComments.length} comments</span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  <button type="button"
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
                     onClick={() => onToggleLike(post.id)}
                     disabled={likingPostId === post.id}
-                    className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                    className={`rounded-full px-3 py-2 text-sm font-medium transition active:scale-[0.99] disabled:opacity-50 ${
+                      likedByMe ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
                   >
-                    {likingPostId === post.id ? "..." : likedByMe ? "Unlike" : "Like"}
+                    {likingPostId === post.id ? "..." : likedByMe ? "Liked" : "Like"}
                   </button>
                   <button
                     type="button"
                     onClick={() => focusCommentInput(post.id)}
-                    className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                    className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200 active:scale-[0.99]"
                   >
                     Comment
                   </button>
-                  <button type="button"
+                  <button
+                    type="button"
                     onClick={() => void handleSharePost(post)}
-                    className="rounded-full bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                    className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200 active:scale-[0.99]"
                   >
                     Share
                   </button>
                 </div>
 
-                <div className="mt-5 space-y-3 border-t border-slate-100 pt-5">
+                <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
                   {postComments.map((comment) => {
                     const canDeleteComment = currentUserId === comment.user_id;
                     return (
                       <div key={comment.id} className="rounded-2xl bg-slate-50 px-4 py-3">
                         <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">
-                              {comment.profiles?.full_name || "Member"}
-                            </p>
-                            <p className="mt-1 text-sm text-slate-700">{comment.content}</p>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900">{comment.profiles?.full_name || "Member"}</p>
+                            <p className="mt-1 break-words text-sm text-slate-700">{comment.content}</p>
                           </div>
-                          {canDeleteComment && (
-                            <button type="button"
+                          {canDeleteComment ? (
+                            <button
+                              type="button"
                               onClick={() => onDeleteComment(comment.id)}
                               disabled={deletingCommentId === comment.id}
-                              className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50 active:scale-[0.99] disabled:opacity-50"
                             >
                               {deletingCommentId === comment.id ? "Deleting..." : "Delete"}
                             </button>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     );
@@ -448,15 +398,16 @@ function FeedCard({
                           [post.id]: e.target.value,
                         }))
                       }
-                      placeholder="Write a comment..."
-                      className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-[var(--asobu-primary)]"
+                      placeholder="Write a comment"
+                      className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
                     />
-                    <button type="button"
+                    <button
+                      type="button"
                       onClick={() => onAddComment(post.id)}
                       disabled={commentingPostId === post.id || !(commentDrafts[post.id] || "").trim()}
-                      className="app-button-primary rounded-full px-5 py-3 text-sm font-semibold disabled:opacity-50"
+                      className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99] disabled:opacity-50"
                     >
-                      {commentingPostId === post.id ? "..." : "Comment"}
+                      {commentingPostId === post.id ? "..." : "Send"}
                     </button>
                   </div>
                 </div>

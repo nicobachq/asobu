@@ -3,9 +3,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   buildRoleSelectionMap,
   formatPersonRoleLabel,
-  formatRoleSummary,
-  getIdentityContextLabel,
-  getOrganizationTypeAudienceLabel,
   ORGANIZATION_REGISTRATION_OPTIONS,
   PERSON_ROLE_OPTIONS,
   type OrganizationRegistrationType,
@@ -257,23 +254,20 @@ function AuthPage() {
           </Link>
           <Link
             to="/"
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
           >
-            Back to landing page
+            Back
           </Link>
         </div>
 
         <div className="rounded-[32px] bg-white p-5 shadow-sm sm:p-6 lg:p-7">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:gap-7">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-7">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-[2rem]">
                 {isLogin ? "Log in to Asobu" : "Create your Asobu account"}
               </h1>
 
-              <p className="mt-3 text-sm leading-7 text-slate-500 sm:text-base">
-                Build a structured sports identity for players, coaches, scouts, teams,
-                clubs, federations, entities, and communities.
-              </p>
+              
 
               {!isLogin && (
                 <>
@@ -316,47 +310,6 @@ function AuthPage() {
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="mt-6 rounded-[28px] bg-slate-50 p-5">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      {signUpPath === "person" ? "Identity model" : "Organization model"}
-                    </h2>
-                    {signUpPath === "person" ? (
-                      <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
-                        <p>
-                          One account can carry more than one sports role. A coach can also
-                          be a player, and that identity can become searchable later across
-                          Discover.
-                        </p>
-                        <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
-                          <p className="font-semibold text-slate-900">
-                            {formatRoleSummary(selectedRoleValues, primaryRole)}
-                          </p>
-                          <p className="mt-1 text-slate-500">
-                            {getIdentityContextLabel(selectedRoleValues, primaryRole)}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">
-                        <p>
-                          On Asobu, organization is the umbrella for {getOrganizationTypeAudienceLabel().toLowerCase()}, but every organization still has a real human owner behind it.
-                        </p>
-                        <div className="rounded-2xl bg-white p-4 text-sm text-slate-700">
-                          <p className="font-semibold text-slate-900">
-                            {ORGANIZATION_REGISTRATION_OPTIONS.find(
-                              (option) => option.value === organizationType
-                            )?.label || "Organization"}
-                          </p>
-                          <p className="mt-1 text-slate-500">
-                            {ORGANIZATION_REGISTRATION_OPTIONS.find(
-                              (option) => option.value === organizationType
-                            )?.description || ""}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </>
               )}
@@ -445,10 +398,6 @@ function AuthPage() {
                             </option>
                           ))}
                         </select>
-                        <p className="mt-2 text-xs text-slate-500">
-                          Your primary role stays the main public label, while your other
-                          roles remain part of the deeper identity model.
-                        </p>
                       </div>
 
                       <div>

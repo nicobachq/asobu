@@ -22,8 +22,6 @@ type Profile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
-  avatar_url?: string | null;
-  cover_image_url?: string | null;
   created_at: string | null;
 };
 
@@ -223,7 +221,7 @@ function PublicProfilePage() {
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, role, location, main_sport, avatar_url, cover_image_url, created_at')
+        .select('id, full_name, role, location, main_sport, created_at')
         .eq('id', id)
         .maybeSingle();
 
@@ -605,17 +603,13 @@ function PublicProfilePage() {
   return (
     <main className="min-h-screen bg-slate-50/80">
       <div className="relative">
-        <div className="h-56 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 bg-cover bg-center sm:h-64 lg:h-72" style={profile.cover_image_url ? { backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.22), rgba(15, 23, 42, 0.10)), url(${profile.cover_image_url})` } : undefined} />
+        <div className="h-56 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 sm:h-64 lg:h-72" />
 
         <div className="mx-auto max-w-5xl px-6">
           <div className="relative -mt-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-5">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-lg sm:h-32 sm:w-32">
-                {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt={profile.full_name || 'Asobu User'} className="h-full w-full object-cover" />
-                ) : (
-                  getInitials(profile.full_name || 'Asobu User')
-                )}
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-lg sm:h-32 sm:w-32">
+                {getInitials(profile.full_name || 'Asobu User')}
               </div>
               <div className="hidden pb-1 sm:block">
                 <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">{profile.full_name || 'Unnamed user'}</h1>
@@ -879,7 +873,7 @@ function PublicProfilePage() {
                 </div>
               ) : (
                 <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center">
-                  <p className="text-sm text-slate-400">Timeline of teams, phases, and development milestones will appear here.</p>
+                  <p className="text-sm text-slate-400">No sporting history added yet.</p>
                 </div>
               )}
             </section>
@@ -899,7 +893,7 @@ function PublicProfilePage() {
 
               {usingLegacySkillSeed ? (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
-                  This profile is still showing ratings migrated from an earlier generic skill pack. The owner needs to resave this sport-specific version before anonymous voting becomes active.
+                  This profile still uses an older skill pack. The owner needs to resave this sport to activate voting.
                 </div>
               ) : null}
 
@@ -909,7 +903,7 @@ function PublicProfilePage() {
                 </div>
               ) : (
                 <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
-                  <p className="text-xs text-slate-400">No skill identity has been published yet for this sport.</p>
+                  <p className="text-xs text-slate-400">No skill identity published yet.</p>
                 </div>
               )}
 
@@ -962,19 +956,11 @@ function PublicProfilePage() {
 
               {!isOwnProfile && hasSkillIdentity && !usingLegacySkillSeed && (
                 <p className="mt-4 text-xs leading-relaxed text-slate-500">
-                  Anonymous skill votes can currently be submitted only by logged-in players and coaches. Team and match-linked restrictions will become stricter after MVP.
+                  Anonymous skill votes are limited to logged-in players and coaches.
                 </p>
               )}
               {validationMessage && <p className="mt-4 text-sm text-slate-600">{validationMessage}</p>}
             </div>
-
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-900">Achievements</h3>
-              <div className="mt-3 rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center">
-                <p className="text-xs text-slate-400">Badges and recognition will appear here.</p>
-              </div>
-            </div>
-
             {strongestOrganization && (
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-slate-900">Primary affiliation</h3>
@@ -984,17 +970,12 @@ function PublicProfilePage() {
               </div>
             )}
 
-            <div className="rounded-2xl bg-slate-900 p-5 text-white">
-              <h3 className="text-sm font-semibold">Connect on Asobu</h3>
-              <p className="mt-2 text-xs leading-relaxed text-slate-300">
-                {isOwnProfile
-                  ? 'This is your public profile — keep shaping it to attract opportunities.'
-                  : 'Interested? Start a conversation directly on the platform.'}
-              </p>
+            <div className="rounded-2xl bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900">Connect</h3>
               {!isOwnProfile && (
                 <Link
                   to={`/messages?with=${profile.id}`}
-                  className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
                 >
                   Message this member
                 </Link>

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { formatOrganizationTypeLabel, getOrganizationTypeAudienceLabel } from "../lib/identity";
+import { formatOrganizationTypeLabel } from "../lib/identity";
 
 type ManageableOrganization = {
   id: number;
@@ -25,100 +25,56 @@ function getInitials(name: string) {
 
 function SuggestionsCard({ manageableOrganizations }: SuggestionsCardProps) {
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <section className="app-card overflow-hidden rounded-[28px] sm:rounded-[32px]">
-        <div className="app-gradient-panel px-4 py-5 sm:px-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Your network</p>
-          <h2 className="mt-2 text-lg font-bold text-slate-900">Managed organizations</h2>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
-            Quick access to the {getOrganizationTypeAudienceLabel().toLowerCase()} you actively shape on Asobu.
-          </p>
+    <section className="rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Your organizations</h2>
+          <p className="mt-1 text-sm text-slate-500">Quick access to the organizations you manage.</p>
         </div>
+        <Link
+          to="/organizations"
+          className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
+        >
+          View all
+        </Link>
+      </div>
 
-        <div className="p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-slate-900">Quick access</p>
+      <div className="mt-4 space-y-3">
+        {manageableOrganizations.length > 0 ? (
+          manageableOrganizations.slice(0, 4).map((organization) => (
             <Link
-              to="/organizations"
-              className="app-button-secondary rounded-full px-3 py-1.5 text-xs font-medium"
+              key={organization.id}
+              to={`/organizations/${organization.id}`}
+              className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 transition hover:bg-slate-100 active:scale-[0.99]"
             >
-              View all
-            </Link>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {manageableOrganizations.length > 0 ? (
-              manageableOrganizations.slice(0, 3).map((organization) => (
-                <Link
-                  key={organization.id}
-                  to={`/organizations/${organization.id}`}
-                  className="app-card-subtle app-card-hover flex items-center gap-3 rounded-[22px] p-3 sm:rounded-[24px]"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200/80 bg-white">
-                    {organization.logo_url ? (
-                      <img
-                        src={organization.logo_url}
-                        alt={organization.name}
-                        className="h-full w-full rounded-2xl object-contain p-1.5"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-xs font-semibold text-[var(--asobu-primary-dark)]">
-                        {getInitials(organization.name)}
-                      </div>
-                    )}
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                {organization.logo_url ? (
+                  <img
+                    src={organization.logo_url}
+                    alt={organization.name}
+                    className="h-full w-full object-contain p-1.5"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-900 text-xs font-semibold text-white">
+                    {getInitials(organization.name)}
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{organization.name}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                      {formatOrganizationTypeLabel(organization.organization_type)}
-                    </p>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500 sm:rounded-[24px]">
-                You do not manage any organizations yet.
+                )}
               </div>
-            )}
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-sm font-semibold text-slate-900">{organization.name}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-400">
+                  {formatOrganizationTypeLabel(organization.organization_type)}
+                </p>
+              </div>
+            </Link>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
+            You do not manage any organizations yet.
           </div>
-        </div>
-      </section>
-
-      <section className="app-card rounded-[28px] p-4 sm:rounded-[32px] sm:p-5">
-        <h2 className="text-lg font-semibold text-slate-900">Next moves</h2>
-        <div className="mt-4 space-y-3 text-sm text-slate-600">
-          <Link
-            to="/profile"
-            className="app-card-subtle app-card-hover block rounded-[22px] p-4 sm:rounded-[24px]"
-          >
-            <p className="font-semibold text-slate-900">Strengthen your identity</p>
-            <p className="mt-1 leading-7">Complete your profile, clarify your role, and improve your public visibility.</p>
-          </Link>
-
-          <Link
-            to="/discover"
-            className="app-card-subtle app-card-hover block rounded-[22px] p-4 sm:rounded-[24px]"
-          >
-            <p className="font-semibold text-slate-900">Expand your network</p>
-            <p className="mt-1 leading-7">Search players, coaches, and every kind of organization that fits your sporting world.</p>
-          </Link>
-        </div>
-      </section>
-
-      <section className="app-card rounded-[28px] p-4 sm:rounded-[32px] sm:p-5">
-        <h2 className="text-lg font-semibold text-slate-900">What works well on Asobu</h2>
-        <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
-          <div className="app-card-subtle rounded-[22px] p-4 sm:rounded-[24px]">
-            <p className="font-semibold text-slate-900">Identity posts with media</p>
-            <p className="mt-1">Photos, match moments, and community images make profiles more credible.</p>
-          </div>
-          <div className="app-card-subtle rounded-[22px] p-4 sm:rounded-[24px]">
-            <p className="font-semibold text-slate-900">Clear role and sport context</p>
-            <p className="mt-1">The strongest profiles make it obvious who they are, what they do, and where they play.</p>
-          </div>
-        </div>
-      </section>
-    </div>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   formatOrganizationTypeLabel,
-  getOrganizationTypeAudienceLabel,
   normalizeOrganizationType,
   ORGANIZATION_TYPE_FILTER_OPTIONS,
 } from "../lib/identity";
@@ -167,22 +166,15 @@ function OrganizationsListPage() {
         <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">
-                Discover
-              </p>
-              <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-                Organizations
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                On Asobu, organization is the umbrella for {getOrganizationTypeAudienceLabel().toLowerCase()}. Open a page to learn more, send a join request, or manage the organization if you are an admin.
-              </p>
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-400">Directory</p>
+              <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">Organizations</h1>
             </div>
 
             <Link
               to="/profile"
               className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              Create organization from profile
+              Create organization
             </Link>
           </div>
 
@@ -223,13 +215,6 @@ function OrganizationsListPage() {
                 {filteredOrganizations.length}
               </p>
             </div>
-          </div>
-
-          <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-600 sm:rounded-[24px]">
-            <p className="font-semibold text-slate-900">Make organization types clearer</p>
-            <p className="mt-1">
-              Team = one squad or roster. Club = larger sports structure. Federation = governing body. Entity = academy, school, agency, or sports business. Community = informal user-created group.
-            </p>
           </div>
         </section>
 

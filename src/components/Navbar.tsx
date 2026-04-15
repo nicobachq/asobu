@@ -22,7 +22,7 @@ function Navbar({ onLogout }: NavbarProps) {
 
           <nav className="hidden items-center gap-2 md:flex">
             <NavLink to="/" end className={navLinkClass}>
-              Feed
+              Home
             </NavLink>
             <NavLink to="/discover" className={navLinkClass}>
               Discover
@@ -53,7 +53,7 @@ function Navbar({ onLogout }: NavbarProps) {
       <div className="border-t border-slate-100 md:hidden">
         <nav className="no-scrollbar mx-auto flex max-w-7xl gap-2 overflow-x-auto px-3 py-3 sm:px-4">
           <NavLink to="/" end className={navLinkClass}>
-            Feed
+            Home
           </NavLink>
           <NavLink to="/discover" className={navLinkClass}>
             Discover

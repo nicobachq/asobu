@@ -301,37 +301,23 @@ function MessagesPage() {
 
   return (
     <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
-          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 px-6 py-8 text-white">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Messages</p>
-                <h1 className="mt-2 text-3xl font-bold lg:text-4xl">Keep conversations inside Asobu</h1>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-white/75">
-                  Direct, one-to-one conversations with players, coaches, scouts, and sports contacts.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
-                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
-                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Threads</p>
-                  <p className="mt-2 text-3xl font-bold">{conversations.length}</p>
-                </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur">
-                  <p className="text-xs uppercase tracking-[0.18em] text-white/60">Active</p>
-                  <p className="mt-2 text-3xl font-bold">{activeConversation ? 1 : 0}</p>
-                </div>
-              </div>
+      <div className="mx-auto max-w-7xl space-y-5">
+        <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Messages</p>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-900 sm:text-3xl">Messages</h1>
             </div>
+            <span className="text-sm text-slate-500">{conversations.length} conversations</span>
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
           <section className="rounded-[32px] bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">Inbox</h2>
-                <p className="mt-1 text-sm text-slate-500">Open a conversation from Discover or a public profile.</p>
+                
               </div>
               {conversations.length > 0 && (
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
