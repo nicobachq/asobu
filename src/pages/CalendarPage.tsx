@@ -29,7 +29,7 @@ type EventRow = {
   score_for: number | null;
   score_against: number | null;
   created_by: string;
-  organizations?: {
+  related_organization?: {
     id: number;
     name: string;
     organization_type: string | null;
@@ -42,14 +42,16 @@ type OrganizationOption = {
   organization_type: string | null;
 };
 
-type RawEventRow = Omit<EventRow, 'organizations'> & {
-  organizations?: EventRow['organizations'] | EventRow['organizations'][] | null;
+type RawEventRow = Omit<EventRow, 'related_organization'> & {
+  related_organization?: EventRow['related_organization'] | EventRow['related_organization'][] | null;
 };
 
 function normalizeEventRow(event: RawEventRow): EventRow {
   return {
     ...event,
-    organizations: Array.isArray(event.organizations) ? event.organizations[0] || null : event.organizations || null,
+    related_organization: Array.isArray(event.related_organization)
+      ? event.related_organization[0] || null
+      : event.related_organization || null,
   };
 }
 
@@ -135,7 +137,7 @@ function CalendarPage() {
     const publicEventsPromise = supabase
       .from('events')
       .select(
-        'id, title, event_type, status, sport, starts_at, ends_at, location, visibility, description, related_organization_id, competition_name, opponent_name, score_for, score_against, created_by, organizations(id, name, organization_type)'
+        'id, title, event_type, status, sport, starts_at, ends_at, location, visibility, description, related_organization_id, competition_name, opponent_name, score_for, score_against, created_by, related_organization:organizations!events_related_organization_id_fkey(id, name, organization_type)'
       )
       .eq('visibility', 'public')
       .order('starts_at', { ascending: true })
@@ -145,7 +147,7 @@ function CalendarPage() {
       ? supabase
           .from('events')
           .select(
-            'id, title, event_type, status, sport, starts_at, ends_at, location, visibility, description, related_organization_id, competition_name, opponent_name, score_for, score_against, created_by, organizations(id, name, organization_type)'
+            'id, title, event_type, status, sport, starts_at, ends_at, location, visibility, description, related_organization_id, competition_name, opponent_name, score_for, score_against, created_by, related_organization:organizations!events_related_organization_id_fkey(id, name, organization_type)'
           )
           .eq('created_by', userId)
           .eq('visibility', 'private')
@@ -156,7 +158,7 @@ function CalendarPage() {
     const organizationOptionsPromise = userId
       ? supabase
           .from('organization_members')
-          .select('organization_id, organizations(id, name, organization_type)')
+          .select('organization_id, related_organization:organizations!events_related_organization_id_fkey(id, name, organization_type)')
           .eq('user_id', userId)
       : Promise.resolve({ data: [], error: null });
 
