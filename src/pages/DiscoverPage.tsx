@@ -26,6 +26,8 @@ type DbProfile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
+  avatar_url?: string | null;
+  cover_image_url?: string | null;
 };
 
 type ProfileCardData = {
@@ -35,6 +37,8 @@ type ProfileCardData = {
   sports: string[];
   organization: string;
   openTo: string[];
+  avatarUrl?: string | null;
+  coverImageUrl?: string | null;
 };
 
 type MembershipLookupRow = {
@@ -89,6 +93,8 @@ type DiscoverProfile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
+  avatar_url?: string | null;
+  cover_image_url?: string | null;
   organization_name: string | null;
   roles: PersonRole[];
   primary_role: PersonRole | null;
@@ -221,13 +227,15 @@ function DiscoverPage() {
       sports: getSportLabelsFromValue(dbProfile.main_sport),
       organization: firstOrganization,
       openTo: getOpenToLabelsForRoles(resolvedRoles),
+      avatarUrl: dbProfile.avatar_url || null,
+      coverImageUrl: dbProfile.cover_image_url || null,
     });
   }
 
   async function loadDiscoverProfiles() {
     const { data: profilesData, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, full_name, role, location, main_sport")
+      .select("id, full_name, role, location, main_sport, avatar_url, cover_image_url")
       .order("full_name", { ascending: true });
 
     if (profilesError) {
@@ -584,12 +592,27 @@ function DiscoverPage() {
 
                     return (
                       <article key={item.id} className="app-card-hover overflow-hidden rounded-[28px] border border-slate-200 bg-white ring-1 ring-white/70">
-                        <div className="h-24 bg-gradient-to-br from-[color:color-mix(in_oklab,var(--asobu-primary)_14%,white_86%)] via-white to-[color:color-mix(in_oklab,var(--asobu-warm)_10%,white_90%)]" />
+                        <div
+                          className="h-24 bg-gradient-to-br from-[color:color-mix(in_oklab,var(--asobu-primary)_14%,white_86%)] via-white to-[color:color-mix(in_oklab,var(--asobu-warm)_10%,white_90%)]"
+                          style={
+                            item.cover_image_url
+                              ? {
+                                  backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.12), rgba(255, 255, 255, 0.18)), url(${item.cover_image_url})`,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
+                                }
+                              : undefined
+                          }
+                        />
                         <div className="p-4 sm:p-5">
                           <div className="-mt-12 flex items-start justify-between gap-4">
                             <div className="flex items-start gap-4">
-                              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-lg font-semibold text-[var(--asobu-primary-dark)] shadow-sm">
-                                {getInitials(item.full_name || "Asobu User")}
+                              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-[linear-gradient(135deg,color-mix(in_oklab,var(--asobu-primary)_18%,white_82%),color-mix(in_oklab,var(--asobu-warm)_14%,white_86%))] text-lg font-semibold text-[var(--asobu-primary-dark)] shadow-sm">
+                                {item.avatar_url ? (
+                                  <img src={item.avatar_url} alt={item.full_name || "Asobu User"} className="h-full w-full object-cover" />
+                                ) : (
+                                  getInitials(item.full_name || "Asobu User")
+                                )}
                               </div>
                               <div className="min-w-0 pt-8">
                                 <h2 className="truncate text-xl font-bold text-slate-900">{item.full_name || "Unnamed user"}</h2>

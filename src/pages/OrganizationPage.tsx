@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { getFileFromInputEvent, revokeObjectUrl, uploadPostImage, validatePostImageFile } from "../lib/media";
@@ -20,6 +20,8 @@ type DbProfile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
+  avatar_url?: string | null;
+  cover_image_url?: string | null;
 };
 
 type ProfileCardData = {
@@ -29,6 +31,8 @@ type ProfileCardData = {
   sports: string[];
   organization: string;
   openTo: string[];
+  avatarUrl?: string | null;
+  coverImageUrl?: string | null;
 };
 
 type Organization = {
@@ -57,6 +61,8 @@ type RelatedProfile = {
   role: string | null;
   location?: string | null;
   main_sport?: string | null;
+  avatar_url?: string | null;
+  cover_image_url?: string | null;
 };
 
 type RelatedCommentProfile = {
@@ -237,6 +243,11 @@ function OrganizationPage() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [pageMessage, setPageMessage] = useState("");
+
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const [openMediaMenu, setOpenMediaMenu] = useState<"logo" | "cover" | null>(null);
+  const [savingMedia, setSavingMedia] = useState<"logo" | "cover" | null>(null);
 
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileCardData>({
@@ -437,6 +448,8 @@ function OrganizationPage() {
       sports: dbProfile.main_sport ? [dbProfile.main_sport] : [],
       organization: firstOrganization,
       openTo: ["Teams", "Clubs", "Communities"],
+      avatarUrl: dbProfile.avatar_url || null,
+      coverImageUrl: dbProfile.cover_image_url || null,
     });
   }
 
@@ -518,7 +531,7 @@ function OrganizationPage() {
     const { data: memberRows, error: memberError } = await supabase
       .from("organization_members")
       .select(
-        "id, user_id, member_role, created_at, profiles(full_name, role, location, main_sport)"
+        "id, user_id, member_role, created_at, profiles(full_name, role, location, main_sport, avatar_url, cover_image_url)"
       )
       .eq("organization_id", orgId)
       .order("created_at", { ascending: true });
@@ -563,7 +576,7 @@ function OrganizationPage() {
           const { data: requesterProfiles, error: requesterProfilesError } =
             await supabase
               .from("profiles")
-              .select("id, full_name, role, location, main_sport")
+              .select("id, full_name, role, location, main_sport, avatar_url, cover_image_url")
               .in("id", requesterIds);
 
           if (requesterProfilesError) {
@@ -742,6 +755,57 @@ function OrganizationPage() {
     setPageMessage("");
   }
 
+  function triggerOrganizationLogoPicker() {
+    setOpenMediaMenu(null);
+    logoInputRef.current?.click();
+  }
+
+  function triggerOrganizationCoverPicker() {
+    setOpenMediaMenu(null);
+    coverInputRef.current?.click();
+  }
+
+  async function persistOrganizationMedia(options: { target: "logo" | "cover"; file?: File | null; remove?: boolean }) {
+    if (!organizationId || !organization || !canEditOrganization) return;
+
+    const { target, file, remove } = options;
+    const label = target === "logo" ? "Organization logo" : "Organization banner";
+    const existingUrl = target === "logo" ? orgLogoUrl : orgCoverImageUrl;
+
+    setSavingMedia(target);
+    setOpenMediaMenu(null);
+    setPageError("");
+    setPageMessage("");
+
+    try {
+      let nextUrl: string | null = remove ? null : existingUrl.trim() || null;
+      if (!remove && file) {
+        nextUrl = await uploadOrganizationMedia(file, target);
+      }
+      const updates = target === "logo" ? { logo_url: nextUrl } : { cover_image_url: nextUrl };
+      const { error } = await supabase.from("organizations").update(updates).eq("id", organizationId);
+      if (error) throw new Error(error.message);
+
+      setOrganization((prev) => (prev ? { ...prev, ...updates } : prev));
+      if (target === "logo") {
+        safeRevokeObjectUrl(logoPreviewUrl);
+        setOrgLogoUrl(nextUrl || "");
+        setLogoPreviewUrl(nextUrl || "");
+      } else {
+        safeRevokeObjectUrl(coverPreviewUrl);
+        setOrgCoverImageUrl(nextUrl || "");
+        setCoverPreviewUrl(nextUrl || "");
+      }
+      setPageMessage(remove ? `${label} removed.` : `${label} updated.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Error updating ${label.toLowerCase()}.`;
+      console.error(`Error updating ${label.toLowerCase()}:`, message);
+      setPageError(`Error: ${message}`);
+    } finally {
+      setSavingMedia(null);
+    }
+  }
+
   function handleLogoFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -759,11 +823,7 @@ function OrganizationPage() {
     }
 
     setPageError("");
-    safeRevokeObjectUrl(logoPreviewUrl);
-
-    const nextPreviewUrl = URL.createObjectURL(file);
-    setLogoFile(file);
-    setLogoPreviewUrl(nextPreviewUrl);
+    void persistOrganizationMedia({ target: "logo", file });
   }
 
   function handleCoverFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -783,25 +843,15 @@ function OrganizationPage() {
     }
 
     setPageError("");
-    safeRevokeObjectUrl(coverPreviewUrl);
-
-    const nextPreviewUrl = URL.createObjectURL(file);
-    setCoverFile(file);
-    setCoverPreviewUrl(nextPreviewUrl);
+    void persistOrganizationMedia({ target: "cover", file });
   }
 
   function handleRemoveLogo() {
-    safeRevokeObjectUrl(logoPreviewUrl);
-    setLogoFile(null);
-    setOrgLogoUrl("");
-    setLogoPreviewUrl("");
+    void persistOrganizationMedia({ target: "logo", remove: true });
   }
 
   function handleRemoveCover() {
-    safeRevokeObjectUrl(coverPreviewUrl);
-    setCoverFile(null);
-    setOrgCoverImageUrl("");
-    setCoverPreviewUrl("");
+    void persistOrganizationMedia({ target: "cover", remove: true });
   }
 
   async function uploadOrganizationMedia(
@@ -1460,12 +1510,14 @@ function OrganizationPage() {
 
       <div className="space-y-6">
         <section className="overflow-hidden rounded-[32px] bg-white shadow-sm">
+          <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoFileChange} />
+          <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
           <div
-            className="relative h-[360px] bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
+            className="group relative h-[360px] bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
             style={
-              organization.cover_image_url
+              (coverPreviewUrl || organization.cover_image_url)
                 ? {
-                    backgroundImage: `url(${organization.cover_image_url})`,
+                    backgroundImage: `url(${coverPreviewUrl || organization.cover_image_url})`,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                   }
@@ -1507,7 +1559,7 @@ function OrganizationPage() {
                     }}
                     className={heroGhostButton}
                   >
-                    Edit organization
+                    Edit details
                   </button>
                 )}
 
@@ -1526,7 +1578,7 @@ function OrganizationPage() {
                   onClick={() => void handleShareOrganization()}
                   className={heroGhostButton}
                 >
-                  Share organization
+                  Share
                 </button>
 
                 <Link to="/organizations" className={heroGhostButton}>
@@ -1535,21 +1587,81 @@ function OrganizationPage() {
               </div>
             </div>
 
+            {canEditOrganization ? (
+              <div className="absolute right-6 top-20 z-10">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setOpenMediaMenu((current) => (current === "cover" ? null : "cover"))}
+                    className={`flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/95 text-slate-700 shadow-lg transition sm:opacity-0 sm:group-hover:opacity-100 ${openMediaMenu === "cover" || savingMedia === "cover" ? "opacity-100" : ""}`}
+                    aria-label="Edit organization banner"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                      <path d="M4.5 7.5h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 9v8.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5V9A1.5 1.5 0 0 1 4.5 7.5Z" />
+                      <circle cx="12" cy="13" r="3.5" />
+                    </svg>
+                  </button>
+                  {openMediaMenu === "cover" ? (
+                    <div className="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                      <button type="button" onClick={triggerOrganizationCoverPicker} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+                        {savingMedia === "cover" ? "Uploading…" : "Change banner"}
+                      </button>
+                      {(coverPreviewUrl || organization.cover_image_url) ? (
+                        <button type="button" onClick={handleRemoveCover} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50">
+                          {savingMedia === "cover" ? "Removing…" : "Remove banner"}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div className="flex min-w-0 items-end gap-4">
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[24px] border border-white/20 bg-white shadow-xl sm:h-28 sm:w-28 sm:rounded-[28px]">
-                    {organization.logo_url ? (
-                      <img
-                        src={organization.logo_url}
-                        alt={organization.name}
-                        className="h-full w-full rounded-[20px] object-contain p-2 sm:rounded-[24px] sm:p-2.5"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-slate-900 text-lg font-semibold text-white sm:rounded-[24px] sm:text-2xl">
-                        {getInitials(organization.name)}
+                  <div className="group relative">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[24px] border border-white/20 bg-white shadow-xl sm:h-28 sm:w-28 sm:rounded-[28px]">
+                      {organization.logo_url ? (
+                        <img
+                          src={organization.logo_url}
+                          alt={organization.name}
+                          className="h-full w-full rounded-[20px] object-contain p-2 sm:rounded-[24px] sm:p-2.5"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-slate-900 text-lg font-semibold text-white sm:rounded-[24px] sm:text-2xl">
+                          {getInitials(organization.name)}
+                        </div>
+                      )}
+                    </div>
+                    {canEditOrganization ? (
+                      <div className="absolute bottom-1 right-1 z-10">
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setOpenMediaMenu((current) => (current === "logo" ? null : "logo"))}
+                            className={`flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/95 text-slate-700 shadow-lg transition sm:opacity-0 sm:group-hover:opacity-100 ${openMediaMenu === "logo" || savingMedia === "logo" ? "opacity-100" : ""}`}
+                            aria-label="Edit organization logo"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4.5 w-4.5">
+                              <path d="M4.5 7.5h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 9v8.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5V9A1.5 1.5 0 0 1 4.5 7.5Z" />
+                              <circle cx="12" cy="13" r="3.5" />
+                            </svg>
+                          </button>
+                          {openMediaMenu === "logo" ? (
+                            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-44 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                              <button type="button" onClick={triggerOrganizationLogoPicker} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+                                {savingMedia === "logo" ? "Uploading…" : "Change logo"}
+                              </button>
+                              {(logoPreviewUrl || organization.logo_url) ? (
+                                <button type="button" onClick={handleRemoveLogo} className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50">
+                                  {savingMedia === "logo" ? "Removing…" : "Remove logo"}
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
                   <div className="min-w-0">
@@ -1668,7 +1780,7 @@ function OrganizationPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Organization events</p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-900">Calendar activity</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Upcoming training sessions, matches, and recent results tied to this organization. This keeps the page alive without forcing formal federation structure.
+                Upcoming events and recent results linked to this organization.
               </p>
             </div>
 
@@ -1746,8 +1858,7 @@ function OrganizationPage() {
                   Organization settings
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Update the main details and upload logo and cover directly from your
-                  computer.
+                  Update the main details for this organization.
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -1825,95 +1936,8 @@ function OrganizationPage() {
                   />
                 </div>
 
-                <div className="rounded-[28px] border border-slate-200 p-4">
-                  <p className="text-sm font-medium text-slate-700">Logo</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Recommended: rectangular or square logo. Max 2 MB.
-                  </p>
-
-                  <div className="mt-4 flex items-center gap-4">
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[24px] border border-slate-200 bg-white">
-                      {logoPreviewUrl ? (
-                        <img
-                          src={logoPreviewUrl}
-                          alt="Logo preview"
-                          className="h-full w-full rounded-[20px] object-contain p-2"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center rounded-[20px] bg-slate-900 text-lg font-semibold text-white">
-                          {getInitials(orgName || organization.name)}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <label className={smallPrimaryButton + " cursor-pointer"}>
-                        Choose logo
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleLogoFileChange}
-                        />
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className={smallSecondaryButton}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-
-                  {logoFile && (
-                    <p className="mt-3 text-xs text-slate-500">{logoFile.name}</p>
-                  )}
-                </div>
-
-                <div className="rounded-[28px] border border-slate-200 p-4">
-                  <p className="text-sm font-medium text-slate-700">Cover</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Recommended: wide image. Max 5 MB.
-                  </p>
-
-                  <div
-                    className="mt-4 h-32 rounded-2xl bg-gradient-to-r from-slate-900 via-sky-700 to-emerald-500"
-                    style={
-                      coverPreviewUrl
-                        ? {
-                            backgroundImage: `url(${coverPreviewUrl})`,
-                            backgroundSize: "cover",
-                            backgroundPosition: "center",
-                          }
-                        : undefined
-                    }
-                  />
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <label className={smallPrimaryButton + " cursor-pointer"}>
-                      Choose cover
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleCoverFileChange}
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={handleRemoveCover}
-                      className={smallSecondaryButton}
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  {coverFile && (
-                    <p className="mt-3 text-xs text-slate-500">{coverFile.name}</p>
-                  )}
+                <div className="md:col-span-2 rounded-[28px] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                  Update logo and banner directly from the header media above.
                 </div>
 
                 <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
@@ -2530,7 +2554,7 @@ function OrganizationPage() {
         </section>
 
         <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Branding</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Media preview</h2>
           <div className="mt-5 space-y-4">
             <div>
               <p className="text-sm text-slate-500">Logo</p>
@@ -2568,18 +2592,18 @@ function OrganizationPage() {
         </section>
 
         <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Management</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Access</h2>
 
           <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-7 text-slate-600">
             {canManageMembers
-              ? "You can edit organization details, upload branding, transfer ownership, review join requests, promote or remove members, and publish organization posts on this page."
+              ? "Manage details, media, requests, and ownership from this page."
               : canManageOrganization
-              ? "You can edit organization details, upload branding, review join requests, publish organization posts, and leave the organization yourself. Member role changes and ownership transfer stay limited to the owner."
+              ? "Edit details, update media, and review requests from this page."
               : canSelfLeave
               ? "You are a member of this organization and can leave it at any time from the top action buttons."
               : myMembershipRole === "owner"
               ? "You are the owner of this organization. Transfer ownership first if you want to leave later."
-              : "You can read the organization page and interact with posts, but management actions stay limited to admins and owners."}
+              : "You can view the organization and interact with its activity."}
           </div>
         </section>
       </div>

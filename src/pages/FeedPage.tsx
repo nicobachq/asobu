@@ -12,6 +12,8 @@ type DbProfile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
+  avatar_url?: string | null;
+  cover_image_url?: string | null;
 };
 
 type RelatedProfile = {

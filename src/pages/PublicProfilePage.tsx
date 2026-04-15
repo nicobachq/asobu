@@ -22,6 +22,8 @@ type Profile = {
   role: string | null;
   location: string | null;
   main_sport: string | null;
+  avatar_url?: string | null;
+  cover_image_url?: string | null;
   created_at: string | null;
 };
 
@@ -221,7 +223,7 @@ function PublicProfilePage() {
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, role, location, main_sport, created_at')
+        .select('id, full_name, role, location, main_sport, avatar_url, cover_image_url, created_at')
         .eq('id', id)
         .maybeSingle();
 
@@ -603,13 +605,17 @@ function PublicProfilePage() {
   return (
     <main className="min-h-screen bg-slate-50/80">
       <div className="relative">
-        <div className="h-56 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 sm:h-64 lg:h-72" />
+        <div className="h-56 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 bg-cover bg-center sm:h-64 lg:h-72" style={profile.cover_image_url ? { backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.22), rgba(15, 23, 42, 0.10)), url(${profile.cover_image_url})` } : undefined} />
 
         <div className="mx-auto max-w-5xl px-6">
           <div className="relative -mt-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-5">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-lg sm:h-32 sm:w-32">
-                {getInitials(profile.full_name || 'Asobu User')}
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-slate-900 text-3xl font-bold text-white shadow-lg sm:h-32 sm:w-32">
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt={profile.full_name || 'Asobu User'} className="h-full w-full object-cover" />
+                ) : (
+                  getInitials(profile.full_name || 'Asobu User')
+                )}
               </div>
               <div className="hidden pb-1 sm:block">
                 <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">{profile.full_name || 'Unnamed user'}</h1>
