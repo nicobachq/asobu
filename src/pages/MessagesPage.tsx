@@ -156,6 +156,39 @@ function MessagesPage() {
     navigate(`/messages/${conversations[0].id}`, { replace: true });
   }, [currentUserId, targetUserId, conversationId, conversations, navigate]);
 
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`messages-page-${currentUserId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "messages" },
+        () => {
+          void loadMessagesPage(currentUserId);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversation_participants" },
+        () => {
+          void loadMessagesPage(currentUserId);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
+        () => {
+          void loadMessagesPage(currentUserId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
   async function loadMessagesPage(userId: string) {
     setLoading(true);
     setPageError("");
@@ -281,10 +314,12 @@ function MessagesPage() {
     setSending(true);
     setPageError("");
 
+    const messageBody = draft.trim();
+
     const { error } = await supabase.from("messages").insert({
       conversation_id: activeConversationId,
       sender_user_id: currentUserId,
-      body: draft.trim(),
+      body: messageBody,
     });
 
     if (error) {
@@ -311,9 +346,7 @@ function MessagesPage() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">Inbox</h2>
-                
               </div>
-
             </div>
 
             {pageError && (
@@ -334,7 +367,10 @@ function MessagesPage() {
               <div className="rounded-[24px] border border-dashed border-slate-200 p-6 text-center">
                 <h3 className="text-lg font-semibold text-slate-900">No conversations yet</h3>
                 <div className="mt-4">
-                  <Link to="/discover" className="inline-flex rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+                  <Link
+                    to="/discover"
+                    className="inline-flex rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+                  >
                     Go to discover
                   </Link>
                 </div>
@@ -385,7 +421,6 @@ function MessagesPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h2 className="text-xl font-semibold text-slate-900">{activeConversation.title}</h2>
-
                     </div>
 
                     {activeConversation.otherUserId && (
@@ -402,7 +437,7 @@ function MessagesPage() {
                 <div className="min-h-[380px] space-y-4 px-6 py-6">
                   {activeMessages.length === 0 ? (
                     <div className="rounded-[24px] border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-No messages yet.
+                      No messages yet.
                     </div>
                   ) : (
                     activeMessages.map((message) => {
@@ -430,11 +465,20 @@ No messages yet.
                       type="text"
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          void handleSendMessage();
+                        }
+                      }}
                       placeholder="Write a message..."
                       className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
                     />
-                    <button type="button"
-                      onClick={handleSendMessage}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleSendMessage();
+                      }}
                       disabled={sending || !draft.trim()}
                       className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                     >
