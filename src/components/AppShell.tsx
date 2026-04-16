@@ -38,7 +38,7 @@ function MobileDock() {
                   className={[
                     'h-1.5 w-7 rounded-full transition',
                     isActive
-                      ? 'bg-gradient-to-r from-teal-600 to-emerald-400'
+                      ? 'bg-[linear-gradient(135deg,var(--asobu-primary-dark),var(--asobu-primary-light))]'
                       : 'bg-slate-200',
                   ].join(' ')}
                 />

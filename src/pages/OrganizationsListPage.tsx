@@ -166,7 +166,7 @@ function OrganizationsListPage() {
       <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6">
         <section className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6 ring-1 ring-slate-200/70">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            
+            <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Organizations</h1>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.5fr)_220px_auto] lg:min-w-[720px]">
               <input
                 type="text"
@@ -227,7 +227,7 @@ function OrganizationsListPage() {
                             {!myRole && hasPendingRequest ? <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">Pending</span> : null}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-3 text-sm text-slate-500">
-                            <span>{memberCount} {memberCount === 1 ? "member" : "members"}</span>
+                            <span>{memberCount} members</span>
                             {organization.location ? <span className="break-words">{organization.location}</span> : null}
                           </div>
                           {organization.description ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{organization.description}</p> : null}

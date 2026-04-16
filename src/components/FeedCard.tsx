@@ -329,12 +329,10 @@ function FeedCard({
               ) : null}
 
               <div className="border-t border-slate-100 px-4 py-3.5">
-                {(postLikes.length > 0 || postComments.length > 0) && (
                 <div className="flex items-center justify-between text-sm text-slate-500">
-                  {postLikes.length > 0 && <span>{postLikes.length} {postLikes.length === 1 ? 'like' : 'likes'}</span>}
-                  {postComments.length > 0 && <span>{postComments.length} {postComments.length === 1 ? 'comment' : 'comments'}</span>}
+                  <span>{postLikes.length} likes</span>
+                  <span>{postComments.length} comments</span>
                 </div>
-                )}
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button

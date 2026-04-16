@@ -271,12 +271,14 @@ function DiscoverPage() {
     <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
       <div className="mx-auto max-w-7xl space-y-5">
         <section className="rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-slate-200/70 sm:p-6">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Discover</h1>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
             {[
               { key: "players", label: "Players", count: tabCounts.players },
               { key: "coaches", label: "Coaches", count: tabCounts.coaches },
               { key: "organizations", label: "Organizations", count: tabCounts.organizations },
-            ].filter((tab) => tab.count > 0).map((tab) => {
+            ].map((tab) => {
               const isActive = activeTab === tab.key;
               return (
                 <button
@@ -351,7 +353,7 @@ function DiscoverPage() {
                         <h3 className="break-words text-lg font-semibold text-slate-900">{organization.name}</h3>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{formatOrganizationTypeLabel(organization.organization_type)}</span>
-                          {organization.sport ? <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">{getPrimarySportLabelFromValue(organization.sport)}</span> : null}
+                          {organization.sport ? <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">{getPrimarySportLabelFromValue(organization.sport)}</span> : null}
                         </div>
                         {organization.location ? <p className="mt-3 text-sm text-slate-500">{organization.location}</p> : null}
                       </div>
@@ -396,7 +398,7 @@ function DiscoverPage() {
                         {getSportLabelsFromValue(item.main_sport).length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {getSportLabelsFromValue(item.main_sport).map((sport) => (
-                              <span key={sport} className="rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">{sport}</span>
+                              <span key={sport} className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">{sport}</span>
                             ))}
                           </div>
                         ) : null}
