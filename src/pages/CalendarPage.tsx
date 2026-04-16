@@ -163,6 +163,7 @@ function CalendarPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -638,13 +639,14 @@ function CalendarPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 py-4 sm:px-4 sm:py-6 lg:px-6">
-      <section className="rounded-[28px] bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200/70 sm:px-6"><h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Calendar</h1></section>
-
       <div className="grid gap-6 xl:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
         <section ref={formSectionRef} className="rounded-[28px] bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
-          <div><h2 className="text-2xl font-semibold text-slate-900">{isEditing ? 'Edit event' : 'Create event'}</h2></div>
+          <button type="button" onClick={() => setShowForm(f => \!f)} className="flex w-full items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-900">{isEditing ? 'Edit event' : 'New event'}</h2>
+            <span className="text-sm text-slate-400">{showForm ? '▲' : '▼'}</span>
+          </button>
 
-          <form className="mt-6 space-y-5" onSubmit={handleCreateEvent}>
+          {showForm && <form className="mt-6 space-y-5" onSubmit={handleCreateEvent}>
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">Event type</label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -795,7 +797,7 @@ function CalendarPage() {
                     ? 'Loading place suggestions… you can keep typing manually while they load.'
                     : placesStatus === 'error'
                       ? 'Place suggestions could not load, so the field stays manual for now.'
-                      : 'Type a venue or address manually. Add VITE_GOOGLE_MAPS_API_KEY later to enable Google Places suggestions.'}
+                      : 'Type a venue or address manually.'}
               </p>
             </div>
 
@@ -984,7 +986,7 @@ function CalendarPage() {
                 </button>
               ) : null}
             </div>
-          </form>
+          </form>}
         </section>
 
         <section className="space-y-5">

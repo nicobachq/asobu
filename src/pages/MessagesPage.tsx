@@ -302,10 +302,6 @@ function MessagesPage() {
   return (
     <main className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6">
       <div className="mx-auto max-w-7xl space-y-5">
-        <section className="rounded-[28px] bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200/70">
-          <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Messages</h1>
-        </section>
-
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
           <section className="rounded-[32px] bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-start justify-between gap-3">
