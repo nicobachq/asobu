@@ -1,96 +1,115 @@
-import { NavLink } from 'react-router-dom';
+import {
+  Home, Compass, User, Users, Calendar, MessageCircle,
+  Settings, ChevronLeft, ChevronRight, Trophy,
+} from "lucide-react";
+import { Link, useLocation } from "@tanstack/react-router";
+import { useState } from "react";
 
-type AppSidebarProps = {
-  onLogout: () => void;
-};
+const mainNav = [
+  { title: "Feed", url: "/feed", icon: Home, badge: 0 },
+  { title: "Discover", url: "/discover", icon: Compass, badge: 0 },
+  { title: "Profile", url: "/profile", icon: User, badge: 0 },
+  { title: "Organizations", url: "/organizations", icon: Users, badge: 0 },
+  { title: "Calendar", url: "/calendar", icon: Calendar, badge: 2 },
+  { title: "Messages", url: "/messages", icon: MessageCircle, badge: 3 },
+];
 
-type IconName = 'home' | 'discover' | 'organizations' | 'calendar' | 'messages' | 'profile' | 'logout';
+export function AppSidebar() {
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
 
-const navItems: Array<{ to: string; label: string; icon: IconName; end?: boolean }> = [
-  { to: '/', label: 'Home', icon: 'home', end: true },
-  { to: '/discover', label: 'Discover', icon: 'discover' },
-  { to: '/organizations', label: 'Organizations', icon: 'organizations' },
-  { to: '/calendar', label: 'Calendar', icon: 'calendar' },
-  { to: '/messages', label: 'Messages', icon: 'messages' },
-  { to: '/profile', label: 'Profile', icon: 'profile' },
-] as const;
+  const isActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(path + "/");
 
-function Icon({ name }: { name: IconName }) {
-  switch (name) {
-    case 'home':
-      return <span aria-hidden>⌂</span>;
-    case 'discover':
-      return <span aria-hidden>⌕</span>;
-    case 'organizations':
-      return <span aria-hidden>◫</span>;
-    case 'calendar':
-      return <span aria-hidden>☷</span>;
-    case 'messages':
-      return <span aria-hidden>✉</span>;
-    case 'profile':
-      return <span aria-hidden>◉</span>;
-    case 'logout':
-      return <span aria-hidden>↗</span>;
-    default:
-      return null;
-  }
-}
-
-function AppSidebar({ onLogout }: AppSidebarProps) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[15.5rem] flex-col border-r border-slate-200/80 bg-slate-50/95 backdrop-blur md:flex">
-      <div className="px-5 py-6">
-        <div className="text-2xl font-semibold tracking-tight text-slate-950">Asobu</div>
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 ${
+        collapsed ? "w-[4.5rem]" : "w-[15.5rem]"
+      }`}
+    >
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-5 h-14 border-b border-sidebar-border">
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0">
+          <Trophy className="w-4 h-4 text-primary-foreground" />
+        </div>
+        {!collapsed && (
+          <span className="font-heading text-lg font-bold text-sidebar-foreground tracking-tight">
+            Asobu
+          </span>
+        )}
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 pb-4">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              [
-                'group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200/80'
-                  : 'text-slate-600 hover:bg-white hover:text-slate-900',
-              ].join(' ')
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span
-                  className={[
-                    'flex h-9 w-9 items-center justify-center rounded-xl text-base transition',
-                    isActive ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200 group-hover:text-slate-800',
-                  ].join(' ')}
-                >
-                  <Icon name={item.icon} />
+      {/* Navigation */}
+      <nav className="flex-1 py-5 px-3 space-y-0.5 overflow-y-auto">
+        {mainNav.map((item) => {
+          const active = isActive(item.url);
+          return (
+            <Link
+              key={item.url}
+              to={item.url}
+              className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200 ${
+                active
+                  ? "bg-sidebar-accent text-sidebar-primary"
+                  : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+              }`}
+            >
+              <item.icon
+                className={`w-[18px] h-[18px] shrink-0 transition-colors ${
+                  active ? "text-sidebar-primary" : "text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70"
+                }`}
+              />
+              {!collapsed && <span>{item.title}</span>}
+              {item.badge > 0 && (
+                <span className={`${collapsed ? "" : "ml-auto"} w-5 h-5 rounded-full bg-warm flex items-center justify-center`}>
+                  <span className="text-[10px] font-bold text-warm-foreground">{item.badge}</span>
                 </span>
-                <span className="truncate">{item.label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
+              )}
+              {active && !collapsed && item.badge === 0 && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-sidebar-primary/80" />
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
-      <div className="mt-auto border-t border-slate-200/80 p-3">
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex w-full items-center justify-between rounded-2xl bg-white px-3 py-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/80 transition hover:bg-slate-100 hover:text-slate-900 active:scale-[0.99]"
+      {/* Bottom */}
+      <div className="px-3 py-3 border-t border-sidebar-border space-y-0.5">
+        <Link
+          to="/"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all"
         >
-          <span className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-              <Icon name="logout" />
-            </span>
-            Log out
-          </span>
+          <Settings className="w-[18px] h-[18px] shrink-0" />
+          {!collapsed && <span>Settings</span>}
+        </Link>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all w-full"
+        >
+          {collapsed ? (
+            <ChevronRight className="w-[18px] h-[18px] shrink-0" />
+          ) : (
+            <>
+              <ChevronLeft className="w-[18px] h-[18px] shrink-0" />
+              <span>Collapse</span>
+            </>
+          )}
         </button>
+      </div>
+
+      {/* User */}
+      <div className="px-3 py-4 border-t border-sidebar-border">
+        <div className="flex items-center gap-3 px-2">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-warm shrink-0 flex items-center justify-center text-[11px] font-semibold text-primary-foreground">
+            NB
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-[13px] font-medium text-sidebar-foreground truncate">Nicolas Bachmann</p>
+              <p className="text-[10px] text-sidebar-foreground/40 truncate">@nicolasb</p>
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );
 }
-
-export default AppSidebar;
